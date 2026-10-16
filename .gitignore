@@ -1,0 +1,61 @@
+﻿# ==========================================
+# VisionMed — Git Ignore Configuration
+# ==========================================
+
+# --- Node / Frontend ---
+node_modules/
+frontend/node_modules/
+backend_node_legacy/node_modules/
+.next/
+frontend/.next/
+out/
+build/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Python / Backend ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/.venv/
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Environment & Credentials ---
+.env
+.env*.local
+*.local
+
+# --- Datasets (Raw training images & annotations) ---
+# Note: Trained models are preserved in backend/models/
+datasets/
+*.zip
+*.tar.gz
+
+# --- Operating System & Editor Artifacts ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

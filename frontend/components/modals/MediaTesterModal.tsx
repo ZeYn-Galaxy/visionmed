@@ -265,14 +265,14 @@ export const MediaTesterModal: React.FC = () => {
         setImageResult(data);
         const alertPerson = data.persons?.find((p) => Boolean(p.symptom));
         if (alertPerson && alertPerson.symptom) {
-          triggerEmergencyAlert('CAM 01', alertPerson.symptom, 'Tester AI (Foto)');
-          toast.error(`🚨 DETEKSI KEDARURATAN AI: ${alertPerson.symptom.toUpperCase()}!`, { duration: 6000 });
+          triggerEmergencyAlert('CAM 01', alertPerson.symptom, 'AI Tester (Photo)');
+          toast.error(`🚨 AI EMERGENCY DETECTED: ${alertPerson.symptom.toUpperCase()}!`, { duration: 6000 });
         } else {
-          toast.success(`Berhasil mendeteksi ${data.people_count} orang dalam ${data.infer_ms}ms!`, { icon: '🎯' });
+          toast.success(`Detected ${data.people_count} person(s) in ${data.infer_ms}ms!`, { icon: '🎯' });
         }
       } catch (err) {
         console.error(err);
-        toast.error('Gagal memproses gambar pada model YOLO backend.');
+        toast.error('Failed to process image on backend model.');
       } finally {
         setIsProcessing(false);
       }
@@ -301,17 +301,17 @@ export const MediaTesterModal: React.FC = () => {
         setImageResult(data);
         const alertPerson = data.persons?.find((p) => Boolean(p.symptom));
         if (alertPerson && alertPerson.symptom) {
-          triggerEmergencyAlert('CAM 01', alertPerson.symptom, 'Tester AI (Foto)');
-          toast.error(`🚨 DETEKSI KEDARURATAN AI: ${alertPerson.symptom.toUpperCase()}!`, { duration: 6000 });
+          triggerEmergencyAlert('CAM 01', alertPerson.symptom, 'AI Tester (Photo)');
+          toast.error(`🚨 AI EMERGENCY DETECTED: ${alertPerson.symptom.toUpperCase()}!`, { duration: 6000 });
         } else {
-          toast.success(`Foto dianalisis: ${data.people_count} orang terdeteksi (${data.infer_ms}ms)!`, { icon: '🎯' });
+          toast.success(`Photo analyzed: ${data.people_count} person(s) detected (${data.infer_ms}ms)!`, { icon: '🎯' });
         }
         setIsProcessing(false);
       };
       reader.readAsDataURL(blob);
     } catch (err) {
       console.error(err);
-      toast.error('Gagal memuat foto sampel.');
+      toast.error('Failed to load sample image.');
       setIsProcessing(false);
     }
   };
@@ -374,7 +374,7 @@ export const MediaTesterModal: React.FC = () => {
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400">
-                Uji langsung model Computer Vision dengan mengunggah foto atau video Anda sendiri
+                Test Computer Vision models directly by uploading your own photo or video
               </p>
             </div>
           </div>
@@ -397,7 +397,7 @@ export const MediaTesterModal: React.FC = () => {
             }`}
           >
             <ImageIcon className="w-4 h-4 text-cyan-600" />
-            <span>Uji Foto (Image Analysis)</span>
+            <span>Photo Test (Image Analysis)</span>
           </button>
           <button
             onClick={() => setActiveTab('video')}
@@ -408,13 +408,13 @@ export const MediaTesterModal: React.FC = () => {
             }`}
           >
             <Video className="w-4 h-4 text-cyan-600" />
-            <span>Uji Video (Live Frame Stream)</span>
+            <span>Video Test (Live Stream)</span>
           </button>
         </div>
 
         {/* Modal Body */}
         <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 text-xs">
-          {/* ================= TAB 1: UJI FOTO ================= */}
+          {/* ================= TAB 1: PHOTO TEST ================= */}
           {activeTab === 'image' && (
             <div className="space-y-4">
               {/* Controls strip */}
@@ -433,61 +433,61 @@ export const MediaTesterModal: React.FC = () => {
                     className="flex items-center gap-1.5 bg-cyan-700 hover:bg-cyan-600 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-xs transition"
                   >
                     <Upload className="w-3.5 h-3.5" />
-                    <span>Upload Foto Baru</span>
+                    <span>Upload New Photo</span>
                   </button>
 
                   <button
-                    onClick={() => handleUsePresetImage('/samples/test_crowd.jpg', 'Sampel COCO (4 Orang)')}
+                    onClick={() => handleUsePresetImage('/samples/test_crowd.jpg', 'COCO Sample (4 People)')}
                     disabled={isProcessing}
                     className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs px-3 py-2 rounded-lg border border-slate-300 shadow-2xs transition"
                   >
                     <Users className="w-3.5 h-3.5 text-cyan-600" />
-                    <span>Sampel 4 Orang</span>
+                    <span>4 People Sample</span>
                   </button>
 
                   <button
-                    onClick={() => handleUsePresetImage('/samples/sample_fall.jpg', 'Dataset Fall (Jatuh)')}
+                    onClick={() => handleUsePresetImage('/samples/sample_fall.jpg', 'Fall Dataset Sample')}
                     disabled={isProcessing}
                     className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs px-3 py-2 rounded-lg border border-red-200 shadow-2xs transition"
                   >
                     <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
-                    <span>Sampel Fall</span>
+                    <span>Fall Sample</span>
                   </button>
 
                   <button
-                    onClick={() => handleUsePresetImage('/samples/sample_faint.jpg', 'Dataset Faint (Pingsan)')}
+                    onClick={() => handleUsePresetImage('/samples/sample_faint.jpg', 'Faint Dataset Sample')}
                     disabled={isProcessing}
                     className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs px-3 py-2 rounded-lg border border-amber-200 shadow-2xs transition"
                   >
                     <Activity className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Sampel Faint</span>
+                    <span>Faint Sample</span>
                   </button>
 
                   <button
-                    onClick={() => handleUsePresetImage('/samples/sample_pain.jpg', 'Dataset Pain (Nyeri Dada)')}
+                    onClick={() => handleUsePresetImage('/samples/sample_pain.jpg', 'Chest Pain Dataset Sample')}
                     disabled={isProcessing}
                     className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs px-3 py-2 rounded-lg border border-rose-200 shadow-2xs transition"
                   >
                     <Heart className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Sampel Pain</span>
+                    <span>Chest Pain Sample</span>
                   </button>
 
                   <button
-                    onClick={() => handleUsePresetImage('/samples/sample_seizure.jpg', 'Dataset Seizure (Kejang)')}
+                    onClick={() => handleUsePresetImage('/samples/sample_seizure.jpg', 'Seizure Dataset Sample')}
                     disabled={isProcessing}
                     className="flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs px-3 py-2 rounded-lg border border-purple-200 shadow-2xs transition"
                   >
                     <Zap className="w-3.5 h-3.5 text-purple-600" />
-                    <span>Sampel Seizure</span>
+                    <span>Seizure Sample</span>
                   </button>
 
                   <button
-                    onClick={() => handleUsePresetImage('/samples/sample_stroke.jpg', 'Dataset Stroke (Asimetri Facial)')}
+                    onClick={() => handleUsePresetImage('/samples/sample_stroke.jpg', 'Stroke Dataset Sample')}
                     disabled={isProcessing}
                     className="flex items-center gap-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 font-bold text-xs px-3 py-2 rounded-lg border border-cyan-200 shadow-2xs transition"
                   >
                     <Brain className="w-3.5 h-3.5 text-cyan-600" />
-                    <span>Sampel Stroke</span>
+                    <span>Stroke Sample</span>
                   </button>
                 </div>
 
@@ -502,8 +502,8 @@ export const MediaTesterModal: React.FC = () => {
               {isProcessing && (
                 <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-8 flex flex-col items-center justify-center gap-2 text-cyan-900">
                   <div className="w-8 h-8 border-3 border-cyan-600 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="font-bold text-xs">Menganalisis Pose Manusia via YOLO11-Pose ONNX...</span>
-                  <span className="text-[10px] text-cyan-700">Mengevaluasi 17 keypoints anatomi & postur klinis</span>
+                  <span className="font-bold text-xs">Analyzing Human Pose via YOLO11-Pose ONNX...</span>
+                  <span className="text-[10px] text-cyan-700">Evaluating 17 anatomical keypoints & clinical postures</span>
                 </div>
               )}
 
@@ -519,10 +519,10 @@ export const MediaTesterModal: React.FC = () => {
                         className="w-full h-auto max-h-[380px] object-contain"
                       />
                     ) : (
-                      <div className="p-8 text-slate-400">Gambar tidak dapat ditampilkan</div>
+                      <div className="p-8 text-slate-400">Image preview unavailable</div>
                     )}
                     <div className="absolute bottom-2 left-2 bg-slate-900/90 text-cyan-300 font-mono text-[9px] font-bold px-2 py-0.5 rounded border border-cyan-500/40">
-                      ⚡ Inferensi: {imageResult.infer_ms} ms
+                      ⚡ Inference: {imageResult.infer_ms} ms
                     </div>
                   </div>
 
@@ -531,14 +531,14 @@ export const MediaTesterModal: React.FC = () => {
                     {/* Metric Cards */}
                     <div className="grid grid-cols-2 gap-2">
                       <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5">
-                        <div className="text-slate-500 text-[10px] font-semibold">Orang Terdeteksi</div>
+                        <div className="text-slate-500 text-[10px] font-semibold">Persons Detected</div>
                         <div className="text-xl font-extrabold text-cyan-700 flex items-center gap-1.5 mt-0.5">
                           <Users className="w-5 h-5 text-cyan-600" />
                           <span>{imageResult.people_count}</span>
                         </div>
                       </div>
                       <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5">
-                        <div className="text-slate-500 text-[10px] font-semibold">Waktu Proses AI</div>
+                        <div className="text-slate-500 text-[10px] font-semibold">AI Processing Time</div>
                         <div className="text-xl font-extrabold text-emerald-700 flex items-center gap-1.5 mt-0.5">
                           <Cpu className="w-5 h-5 text-emerald-600" />
                           <span>{imageResult.infer_ms} ms</span>
@@ -549,7 +549,7 @@ export const MediaTesterModal: React.FC = () => {
                     {/* Persons List */}
                     <div className="border border-slate-200 rounded-lg p-3 bg-white">
                       <div className="font-bold text-slate-800 text-xs mb-2 flex items-center justify-between">
-                        <span>Daftar Orang Terdeteksi ({imageResult.persons.length})</span>
+                        <span>Detected Persons ({imageResult.persons.length})</span>
                         <span className="text-[10px] text-slate-500 font-normal">YOLO-Pose Landmarks</span>
                       </div>
                       <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
@@ -592,32 +592,32 @@ export const MediaTesterModal: React.FC = () => {
                   className="border-2 border-dashed border-slate-300 hover:border-cyan-500 rounded-2xl p-10 flex flex-col items-center justify-center gap-2 cursor-pointer transition bg-slate-50/50 hover:bg-cyan-50/30 text-slate-600"
                 >
                   <Upload className="w-8 h-8 text-cyan-600 animate-bounce" />
-                  <span className="font-bold text-sm text-slate-800">Klik untuk Mengunggah Foto Pengujian</span>
-                  <span className="text-xs text-slate-500">Mendukung file JPG, PNG, atau WebP</span>
+                  <span className="font-bold text-sm text-slate-800">Click to Upload Test Photo</span>
+                  <span className="text-xs text-slate-500">Supports JPG, PNG, or WebP files</span>
                   <div className="flex flex-wrap items-center justify-center gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
-                      onClick={() => handleUsePresetImage('/samples/test_crowd.jpg', 'Sampel COCO (4 Orang)')}
+                      onClick={() => handleUsePresetImage('/samples/test_crowd.jpg', 'COCO Sample (4 People)')}
                       className="bg-cyan-700 hover:bg-cyan-600 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-sm transition flex items-center gap-1.5"
                     >
                       <Users className="w-3.5 h-3.5" />
-                      <span>Sampel (4 Orang)</span>
+                      <span>Sample (4 People)</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleUsePresetImage('/samples/sample_fall.jpg', 'Dataset Fall (Jatuh)')}
+                      onClick={() => handleUsePresetImage('/samples/sample_fall.jpg', 'Fall Dataset Sample')}
                       className="bg-red-600 hover:bg-red-500 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-sm transition flex items-center gap-1.5"
                     >
                       <AlertTriangle className="w-3.5 h-3.5" />
-                      <span>Sampel Fall</span>
+                      <span>Fall Sample</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleUsePresetImage('/samples/sample_faint.jpg', 'Dataset Faint (Pingsan)')}
+                      onClick={() => handleUsePresetImage('/samples/sample_faint.jpg', 'Faint Dataset Sample')}
                       className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-sm transition flex items-center gap-1.5"
                     >
                       <Activity className="w-3.5 h-3.5" />
-                      <span>Sampel Faint</span>
+                      <span>Faint Sample</span>
                     </button>
                   </div>
                 </div>
@@ -652,7 +652,7 @@ export const MediaTesterModal: React.FC = () => {
                       className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs px-3 py-2 rounded-lg border border-slate-300 shadow-2xs transition"
                     >
                       {isVideoPlaying ? <Pause className="w-3.5 h-3.5 text-amber-600" /> : <Play className="w-3.5 h-3.5 text-emerald-600" />}
-                      <span>{isVideoPlaying ? 'Jeda Video' : 'Putar Video'}</span>
+                      <span>{isVideoPlaying ? 'Pause Video' : 'Play Video'}</span>
                     </button>
                   )}
                 </div>
@@ -685,7 +685,7 @@ export const MediaTesterModal: React.FC = () => {
                     </div>
 
                     <div className="absolute bottom-2 left-2 bg-slate-900/80 text-white font-mono text-[9px] px-2 py-0.5 rounded">
-                      STREAM: {videoStats ? `${videoStats.peopleCount} ORANG TERDETEKSI` : 'MEMPROSES...'}
+                      STREAM: {videoStats ? `${videoStats.peopleCount} PERSON(S) DETECTED` : 'PROCESSING...'}
                     </div>
                   </div>
 
@@ -697,7 +697,7 @@ export const MediaTesterModal: React.FC = () => {
                         <span>Real-Time Multi-Person Tracking</span>
                       </div>
                       <p className="text-[11px] text-slate-600">
-                        Setiap frame video di-stream langsung ke backend Python YOLO11-Pose via WebSocket untuk deteksi orang & 17 titik sendi tubuh.
+                        Each video frame streams directly to the Python YOLO11-Pose backend via WebSocket for person detection & 17 body joint tracking.
                       </p>
                     </div>
 
@@ -706,7 +706,7 @@ export const MediaTesterModal: React.FC = () => {
                       <div className="space-y-1.5 max-h-[220px] overflow-y-auto">
                         {videoPersons.length === 0 ? (
                           <div className="text-slate-400 text-[11px] italic py-3 text-center">
-                            Menunggu deteksi orang di video...
+                            Waiting for person detection in video...
                           </div>
                         ) : (
                           videoPersons.map((p, idx) => (
@@ -736,8 +736,8 @@ export const MediaTesterModal: React.FC = () => {
                   className="border-2 border-dashed border-slate-300 hover:border-cyan-500 rounded-2xl p-12 flex flex-col items-center justify-center gap-2 cursor-pointer transition bg-slate-50/50 hover:bg-cyan-50/30 text-slate-600"
                 >
                   <Video className="w-10 h-10 text-cyan-600 animate-pulse" />
-                  <span className="font-bold text-sm text-slate-800">Klik untuk Mengunggah File Video Pengujian</span>
-                  <span className="text-xs text-slate-500">Mendukung format MP4, WebM, MOV dari HP atau rekaman CCTV</span>
+                  <span className="font-bold text-sm text-slate-800">Click to Upload Test Video File</span>
+                  <span className="text-xs text-slate-500">Supports MP4, WebM, MOV formats from phone or CCTV feeds</span>
                 </div>
               )}
             </div>
@@ -748,13 +748,13 @@ export const MediaTesterModal: React.FC = () => {
         <div className="p-3 bg-slate-50 border-t border-gray-200 flex items-center justify-between text-slate-500 text-[11px]">
           <span className="flex items-center gap-1.5">
             <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Dataset Resmi COCO-Keypoints (200k+ citra pelatihan)</span>
+            <span>Official Clinical Multi-Symptom Classifier (94% Accuracy)</span>
           </span>
           <button
             onClick={closeMediaTesterModal}
             className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-1.5 rounded-lg transition"
           >
-            Tutup
+            Close
           </button>
         </div>
       </div>

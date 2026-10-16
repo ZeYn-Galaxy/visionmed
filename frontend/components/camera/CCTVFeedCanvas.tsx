@@ -206,7 +206,7 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({
       } catch (err: unknown) {
         if (isCancelled) return;
         console.error('Camera access error:', err);
-        setWebcamError('Akses kamera tidak diizinkan atau kamera sedang digunakan aplikasi lain.');
+        setWebcamError('Camera access denied or camera is in use by another application.');
       }
     }
 

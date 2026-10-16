@@ -37,7 +37,7 @@ export const DispatchModal: React.FC = () => {
   const handleResolve = async () => {
     await resolveCameraAlert(selectedCameraForDispatch.id);
     toast.success(
-      `Masalah selesai! Kamera ${selectedCameraForDispatch.id} kembali ke status Normal (View).`,
+      `Incident resolved! Camera ${selectedCameraForDispatch.id} returned to Normal (View) status.`,
       {
         duration: 3500,
         icon: '✅',
@@ -62,7 +62,7 @@ export const DispatchModal: React.FC = () => {
               <Siren className="w-5 h-5 text-red-200 animate-pulse" />
             )}
             <h3 className="font-bold text-base">
-              {isDispatched ? 'Status Penanganan Darurat' : 'Dispatch Emergency Response'}
+              {isDispatched ? 'Emergency Response Status' : 'Dispatch Emergency Response'}
             </h3>
           </div>
           <button
@@ -90,14 +90,14 @@ export const DispatchModal: React.FC = () => {
               </span>
             </div>
             <div className="text-gray-600">
-              {isDispatched ? 'Status Penanganan:' : 'Condition Detected:'}{' '}
+              {isDispatched ? 'Response Status:' : 'Condition Detected:'}{' '}
               <span className={`font-semibold ${isDispatched ? 'text-sky-700' : 'text-red-700'}`}>
                 {selectedCameraForDispatch.bboxLabel || selectedCameraForDispatch.badgeText}
               </span>
             </div>
             <div className="text-[11px] text-gray-500 mt-0.5">
               {isDispatched
-                ? 'Tim tanggap darurat telah menuju ke lokasi pasien.'
+                ? 'Emergency response team has been dispatched to the patient location.'
                 : 'Confidence Score: 94.2% • Automated CV Trigger'}
             </div>
           </div>
@@ -106,10 +106,10 @@ export const DispatchModal: React.FC = () => {
             <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-emerald-800 space-y-1">
               <div className="font-bold flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4 text-emerald-600" />
-                <span>Konfirmasi Penyelesaian Masalah</span>
+                <span>Confirm Incident Resolution</span>
               </div>
               <p className="text-[11px] text-emerald-700">
-                Apakah pasien sudah ditangani oleh tim medis dan kondisi area sudah kondusif? Klik tombol di bawah untuk mengembalikan status kamera ke <strong>Normal</strong> dan tombol ke <strong>View</strong>.
+                Has the patient been attended to by medical personnel and the situation stabilized? Click below to return the camera status to <strong>Normal</strong> and action to <strong>View</strong>.
               </p>
             </div>
           ) : (
@@ -163,7 +163,7 @@ export const DispatchModal: React.FC = () => {
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg shadow-sm transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
               >
                 <CheckCircle className="w-4 h-4" />
-                <span>Tandai Masalah Selesai (Kembali ke View)</span>
+                <span>Mark Incident Resolved (Return to View)</span>
               </button>
             ) : (
               <>

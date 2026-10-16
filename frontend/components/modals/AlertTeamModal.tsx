@@ -18,7 +18,7 @@ export const AlertTeamModal: React.FC = () => {
     closeAlertTeamModal();
   };
 
-  const symptomText = activeAlertDetails?.symptom || 'Kedaruratan Medis Terdeteksi';
+  const symptomText = activeAlertDetails?.symptom || 'Medical Emergency Detected';
   const cameraText = activeAlertDetails?.cameraName
     ? `${activeAlertDetails.cameraId} (${activeAlertDetails.cameraName})`
     : activeAlertDetails?.cameraId || 'CCTV Surveillance';
@@ -47,7 +47,7 @@ export const AlertTeamModal: React.FC = () => {
               <span>{symptomText}</span>
             </div>
             <div className="text-[11px] text-red-800 font-semibold">
-              Lokasi: {cameraText}
+              Location: {cameraText}
             </div>
             <p className="text-gray-600">
               Emergency sirens sound locally. SMS notifications sent to registered triage duty phones. Receptionist desktop notification pushed.

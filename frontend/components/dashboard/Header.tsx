@@ -61,10 +61,10 @@ export const Header: React.FC = () => {
           <button
             onClick={openMediaTesterModal}
             className="flex items-center gap-1.5 bg-gradient-to-r from-cyan-700 to-sky-700 hover:from-cyan-600 hover:to-sky-600 text-white text-xs font-bold px-3 py-2 rounded-md transition shadow-xs hover:shadow active:scale-95"
-            title="Uji Model AI: Upload Foto atau Video untuk Evaluasi Pose & Gejala Kedaruratan"
+            title="Test AI Model: Upload Photo or Video to Evaluate Pose & Emergency Symptoms"
           >
             <FlaskConical className="w-3.5 h-3.5 text-cyan-200" />
-            <span>Tester AI (Foto/Video)</span>
+            <span>AI Tester (Photo/Video)</span>
           </button>
 
           {/* Add Camera Button (Only for Security or Admin) */}
@@ -115,16 +115,16 @@ export const Header: React.FC = () => {
                 } else {
                   stopSiren();
                 }
-                toast.success('Konfirmasi Security: Masalah dinyatakan SOLVED (Selesai). Alarm dimatikan.', {
+                toast.success('Security Confirmation: Incident marked as SOLVED. Alarm silenced.', {
                   icon: '✅',
                   duration: 4000
                 });
               }}
               className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-md transition shadow-xs hover:shadow active:scale-95 animate-pulse"
-              title="Konfirmasi Security: Tandai masalah selesai (Solve) dan matikan alarm"
+              title="Security Confirmation: Mark incident resolved (Solve) and silence alarm"
             >
               <CheckCircle className="w-3.5 h-3.5 text-emerald-200" />
-              <span>SOLVED (SELESAI)</span>
+              <span>RESOLVE (SOLVED)</span>
             </button>
           )}
 
@@ -173,8 +173,8 @@ export const Header: React.FC = () => {
                 <div className="p-3 bg-slate-50/80 border-b border-slate-100 text-[11px] text-slate-600 flex items-start gap-1.5">
                   <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                   <span>
-                    <strong>Role Permanen & Terkunci:</strong> Anda masuk sebagai{' '}
-                    <span className="uppercase font-bold text-slate-800">{currentUser.role}</span>. Tidak dapat berganti peran secara instan.
+                    <strong>Permanent & Locked Role:</strong> You are logged in as{' '}
+                    <span className="uppercase font-bold text-slate-800">{currentUser.role}</span>. Roles cannot be switched during an active session.
                   </span>
                 </div>
 
@@ -184,7 +184,7 @@ export const Header: React.FC = () => {
                     className="w-full text-left px-3 py-2 flex items-center gap-2 text-red-600 hover:bg-red-50 rounded-lg transition font-bold"
                   >
                     <LogOut className="w-4 h-4" />
-                    <span>Keluar (Logout Akun)</span>
+                    <span>Sign Out (Logout)</span>
                   </button>
                 </div>
               </div>

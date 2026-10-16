@@ -151,12 +151,14 @@ def extract_clinical_features(kps: np.ndarray, bbox: list[float], orig_w: int, o
     return features
 
 
-def collect_dataset_samples(engine: VisionEngine, max_per_class: int = 150) -> tuple[np.ndarray, np.ndarray, list[str]]:
-    """Scan all 5 Roboflow dataset directories and extract labeled feature vectors."""
+def collect_dataset_samples(engine: VisionEngine, max_per_class: int = 200) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    """Scan all Roboflow dataset directories and extract labeled feature vectors."""
     print("[train] Scanning dataset directories...")
 
     samples_by_class: dict[str, list[np.ndarray]] = {c: [] for c in CLASSES}
-    dataset_base = PROJECT_ROOT / "datasets"
+    dataset_base = PROJECT_ROOT / "Dataset"
+    if not dataset_base.exists():
+        dataset_base = PROJECT_ROOT / "datasets"
 
     # Mapping configuration
     tasks = [
@@ -166,6 +168,7 @@ def collect_dataset_samples(engine: VisionEngine, max_per_class: int = 150) -> t
         ("pain.v1i.yolov8-obb", "Chest Pain", False),
         ("Seizure.v1i.yolov8-obb", "seizure_parser", True),
         ("Stroke.v1i.yolov8-obb", "stroke_parser", True),
+        ("Test.v1i.yolov8-obb", "test_parser", True),
     ]
 
     for folder_name, mode, has_labels in tasks:
@@ -174,7 +177,12 @@ def collect_dataset_samples(engine: VisionEngine, max_per_class: int = 150) -> t
             print(f"[train] Warning: {folder} does not exist, skipping.")
             continue
 
-        img_files = list(folder.glob("**/*.jpg")) + list(folder.glob("**/*.png"))
+        try:
+            img_files = list(folder.glob("**/*.jpg")) + list(folder.glob("**/*.png"))
+        except Exception as e:
+            print(f"[train] Error listing {folder_name}: {e}")
+            continue
+
         print(f"[train] Processing {folder_name}: {len(img_files)} images found...")
         random.seed(42)
         random.shuffle(img_files)
@@ -183,9 +191,7 @@ def collect_dataset_samples(engine: VisionEngine, max_per_class: int = 150) -> t
         added = 0
 
         for img_path in img_files:
-            if mode != "seizure_parser" and added >= max_per_class:
-                break
-            if mode == "seizure_parser" and len(samples_by_class["Seizures / Convulsions"]) >= max_per_class:
+            if mode != "seizure_parser" and mode != "stroke_parser" and mode != "test_parser" and added >= max_per_class:
                 break
 
             target_class = None
@@ -195,12 +201,12 @@ def collect_dataset_samples(engine: VisionEngine, max_per_class: int = 150) -> t
                 target_class = "Chest Pain"
             elif has_labels:
                 # Read label file
-                lbl_path = img_path.parent.parent / "labels" / f"{img_path.stem}.txt"
-                if not lbl_path.exists():
-                    lbl_path = img_path.with_suffix(".txt")
+                try:
+                    lbl_path = img_path.parent.parent / "labels" / f"{img_path.stem}.txt"
+                    if not lbl_path.exists():
+                        lbl_path = img_path.with_suffix(".txt")
 
-                if lbl_path.exists():
-                    try:
+                    if lbl_path.exists():
                         with open(lbl_path) as f:
                             lines = [line.strip() for line in f if line.strip()]
                         if lines:
@@ -211,8 +217,10 @@ def collect_dataset_samples(engine: VisionEngine, max_per_class: int = 150) -> t
                                 target_class = "Normal" if first_cls == 0 else "Seizures / Convulsions"
                             elif mode == "stroke_parser":
                                 target_class = "Normal" if first_cls in [0, 1] else "Stroke Symptoms"
-                    except Exception:
-                        pass
+                            elif mode == "test_parser":
+                                target_class = "Normal" if first_cls == 0 else "Fall / Syncope"
+                except Exception:
+                    pass
 
             if not target_class or len(samples_by_class[target_class]) >= max_per_class:
                 continue
@@ -230,43 +238,39 @@ def collect_dataset_samples(engine: VisionEngine, max_per_class: int = 150) -> t
                     feat = extract_clinical_features(kps, person["bbox"], res["width"], res["height"])
                     samples_by_class[target_class].append(feat)
                     added += 1
-            except Exception as e:
+            except Exception:
                 continue
 
         print(f"[train] Added {added} valid pose samples from {folder_name}.")
 
-    # Augment Normal class with real healthy standing and sitting postures
+    # Augment Normal class with real healthy standing and sitting postures from crowd
     crowd_path = PROJECT_ROOT / "frontend" / "public" / "samples" / "test_crowd.jpg"
     if crowd_path.exists():
-        with open(crowd_path, "rb") as f:
-            buf = f.read()
-        res = engine.process("train_scan", buf)
-        for person in res.get("persons", []):
-            kps = np.array(person["keypoints"])
-            for _ in range(25):  # Add natural variations
-                jitter_kps = kps.copy()
-                jitter_kps[:, :2] += np.random.normal(0, 1.2, size=jitter_kps[:, :2].shape)
-                feat = extract_clinical_features(jitter_kps, person["bbox"], res["width"], res["height"])
-                samples_by_class["Normal"].append(feat)
-
-    # Also extract healthy pre-fall standing persons from Fall dataset
-    fall_folder = dataset_base / "Fall.v1i.yolov8-obb"
-    if fall_folder.exists():
-        for img_path in list(fall_folder.glob("**/*.jpg"))[:120]:
-            if len(samples_by_class["Normal"]) >= 140:
-                break
-            with open(img_path, "rb") as f:
+        try:
+            with open(crowd_path, "rb") as f:
                 buf = f.read()
             res = engine.process("train_scan", buf)
             for person in res.get("persons", []):
-                bbox = person["bbox"]
-                aspect = (bbox[2] - bbox[0]) / max(bbox[3] - bbox[1], 1.0)
                 kps = np.array(person["keypoints"])
-                sho_y = (kps[5, 1] + kps[6, 1]) / 2.0
-                hip_y = (kps[11, 1] + kps[12, 1]) / 2.0
-                if aspect < 0.65 and sho_y < hip_y - 25:
-                    feat = extract_clinical_features(kps, bbox, res["width"], res["height"])
-                    samples_by_class["Normal"].append(feat)
+                for _ in range(15):
+                    jitter_kps = kps.copy()
+                    jitter_kps[:, :2] += np.random.normal(0, 1.2, size=jitter_kps[:, :2].shape)
+                    feat = extract_clinical_features(jitter_kps, person["bbox"], res["width"], res["height"])
+                    if len(samples_by_class["Normal"]) < max_per_class:
+                        samples_by_class["Normal"].append(feat)
+        except Exception:
+            pass
+
+    # Balance any remaining classes with slight biomechanical pose jitter
+    for cls_name, feat_list in samples_by_class.items():
+        if 0 < len(feat_list) < max_per_class:
+            orig = list(feat_list)
+            needed = max_per_class - len(feat_list)
+            for _ in range(needed):
+                base_feat = random.choice(orig)
+                jitter = base_feat.copy()
+                jitter += np.random.normal(0, 0.015, size=jitter.shape).astype(np.float32)
+                feat_list.append(jitter)
 
     # Print summary
     print("\n[train] Class balance summary:")
@@ -289,7 +293,7 @@ def train_symptom_classifier():
     print("=" * 60)
 
     engine = VisionEngine()
-    X, y, class_names = collect_dataset_samples(engine, max_per_class=120)
+    X, y, class_names = collect_dataset_samples(engine, max_per_class=200)
 
     if len(X) < 50:
         print("[train] Error: Insufficient training samples gathered.")
@@ -306,8 +310,8 @@ def train_symptom_classifier():
 
     # Ensemble Classifier: Robust RandomForest with calibrated probability tree depths
     clf = RandomForestClassifier(
-        n_estimators=160,
-        max_depth=14,
+        n_estimators=200,
+        max_depth=16,
         min_samples_split=3,
         min_samples_leaf=2,
         class_weight="balanced",

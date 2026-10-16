@@ -21,7 +21,7 @@ export default function LoginPage() {
     setIsSubmitting(false);
 
     if (success) {
-      toast.success('Login berhasil! Mengalihkan ke dashboard...', { icon: '🏥' });
+      toast.success('Login successful! Redirecting to dashboard...', { icon: '🏥' });
       router.push('/');
     }
   };
@@ -60,14 +60,14 @@ export default function LoginPage() {
           <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-[11px] text-amber-900 flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <span>
-              <strong>Peraturan Keamanan Medis:</strong> 1 Akun hanya dapat login pada 1 perangkat/browser. Peran akun terikat permanen dan tidak dapat ditukar saat sesi berlangsung.
+              <strong>Medical Security Policy:</strong> Each account can only be logged in on 1 device/browser simultaneously. Account roles are permanently bound and cannot be switched during an active session.
             </span>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             {/* Email */}
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Email Pengguna:</label>
+              <label className="block font-bold text-slate-700 mb-1">User Email:</label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
                 <input
@@ -102,7 +102,7 @@ export default function LoginPage() {
               disabled={isSubmitting}
               className="w-full bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold py-2.5 rounded-lg transition shadow-md flex items-center justify-center gap-2 text-xs disabled:opacity-50"
             >
-              <span>{isSubmitting ? 'Memverifikasi...' : 'Masuk ke Sistem'}</span>
+              <span>{isSubmitting ? 'Verifying...' : 'Sign In to System'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
@@ -110,7 +110,7 @@ export default function LoginPage() {
           {/* Quick Select Hospital Accounts for Demo Evaluation */}
           <div className="mt-6 pt-5 border-t border-gray-200">
             <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 block mb-2 text-center">
-              Pilih Akun Rumah Sakit Terdaftar (Default Password: hospital123)
+              Select Registered Hospital Account (Default Password: hospital123)
             </span>
 
             <div className="space-y-2">
@@ -130,7 +130,7 @@ export default function LoginPage() {
                     <div className="text-[10px] text-slate-500">reed.security@visionmed.hospital</div>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-red-600">Gunakan &rarr;</span>
+                <span className="text-[10px] font-bold text-red-600">Use &rarr;</span>
               </button>
 
               <button
@@ -149,7 +149,7 @@ export default function LoginPage() {
                     <div className="text-[10px] text-slate-500">sarah.reception@visionmed.hospital</div>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-sky-600">Gunakan &rarr;</span>
+                <span className="text-[10px] font-bold text-sky-600">Use &rarr;</span>
               </button>
 
               <button
@@ -168,7 +168,7 @@ export default function LoginPage() {
                     <div className="text-[10px] text-slate-500">admin@visionmed.hospital</div>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-emerald-600">Gunakan &rarr;</span>
+                <span className="text-[10px] font-bold text-emerald-600">Use &rarr;</span>
               </button>
             </div>
           </div>

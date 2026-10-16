@@ -151,7 +151,7 @@ export const KpiPanel: React.FC = () => {
           </div>
           {needHelpCount > 0 ? (
             <span className="bg-[#b91c1c] text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full tracking-wide uppercase animate-pulse">
-              {needHelpCount} PERLU BANTUAN
+              {needHelpCount} NEED HELP
             </span>
           ) : (
             <span className="bg-sky-100 text-[#0369a1] text-[10px] font-extrabold px-2 py-0.5 rounded-full tracking-wide uppercase">
@@ -163,7 +163,7 @@ export const KpiPanel: React.FC = () => {
         {/* Location Selector (Daftar List Lokasi Kamera) */}
         <div className="my-1 space-y-1">
           <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between">
-            <span>Pilih Lokasi untuk Bantuan:</span>
+            <span>Select Location for Help:</span>
             <span className="text-[10px] text-gray-400 font-normal">Manual Override</span>
           </label>
           <div className="relative">
@@ -180,7 +180,7 @@ export const KpiPanel: React.FC = () => {
             </select>
           </div>
           <div className="text-[10px] text-slate-400 leading-tight">
-            Gunakan jika CV belum mendeteksi tapi terlihat ada orang yang membutuhkan bantuan.
+            Use if Computer Vision has not detected yet, but you observe someone in need of assistance.
           </div>
         </div>
 
@@ -193,7 +193,7 @@ export const KpiPanel: React.FC = () => {
               unmuteSiren();
               triggerEmergencyAlert(
                 targetCam.id,
-                'Bantuan Darurat Manual Diminta',
+                'Manual Emergency Help Requested',
                 targetCam.name
               );
               startSiren();
@@ -204,8 +204,8 @@ export const KpiPanel: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   camera_id: targetCam.id,
-                  detected_symptom: 'Bantuan Darurat Manual',
-                  status_label: 'Status: Critical Bantuan Darurat',
+                  detected_symptom: 'Manual Emergency Help',
+                  status_label: 'Status: Critical Emergency Help',
                   cv_method: 'Security Manual Dispatch Override',
                   confidence_score: 100.0,
                   bbox_label: 'Manual Help',
@@ -220,7 +220,7 @@ export const KpiPanel: React.FC = () => {
           className="w-full bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold py-2 rounded-md flex items-center justify-center gap-1.5 shadow-sm transition active:scale-[0.99] cursor-pointer"
         >
           <Siren className="w-3.5 h-3.5 text-sky-200 animate-pulse" />
-          <span>Kirim Bantuan ke Lokasi Terpilih</span>
+          <span>Dispatch Help to Selected Location</span>
         </button>
       </div>
     </div>

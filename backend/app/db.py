@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -102,9 +103,19 @@ class JsonDB:
 
     def save(self) -> None:
         with _lock:
+            payload = json.dumps(self.data, indent=2, ensure_ascii=False)
             tmp = self.path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(self.data, indent=2, ensure_ascii=False), encoding="utf-8")
-            tmp.replace(self.path)
+            for _ in range(5):
+                try:
+                    tmp.write_text(payload, encoding="utf-8")
+                    tmp.replace(self.path)
+                    return
+                except (PermissionError, OSError):
+                    time.sleep(0.05)
+            try:
+                self.path.write_text(payload, encoding="utf-8")
+            except Exception:
+                pass
 
     # ---- helpers -------------------------------------------------------
     def find_user_by_email(self, email: str) -> dict | None:

@@ -300,19 +300,31 @@ DETECTORS = {
 
 
 def posture_label(f: Frame) -> str:
+    x1, y1, x2, y2 = f.bbox
+    bw = max(x2 - x1, 1.0)
+    bh = max(y2 - y1, 1.0)
+    aspect = bw / bh
+
     if _is_lying(f):
         return "Lying"
-    if f.angle > 35:
+
+    # Distinguish Bending from Sitting / Standing
+    # When bending: spine is tilted forward (angle > 28) while legs support the body
+    has_legs = visible(f.kps, L_KNE) or visible(f.kps, R_KNE) or visible(f.kps, L_ANK) or visible(f.kps, R_ANK)
+    hip_elevated = (y2 - f.hip[1]) > 0.35 * bh
+
+    if f.angle > 28 and (hip_elevated or has_legs):
         return "Bending"
-    x1, y1, x2, y2 = f.bbox
-    aspect = (x2 - x1) / max(y2 - y1, 1.0)
+
     if visible(f.kps, L_HIP, L_KNE) and visible(f.kps, R_HIP, R_KNE):
         thigh = np.mean([abs(f.kps[L_KNE, 1] - f.kps[L_HIP, 1]), abs(f.kps[R_KNE, 1] - f.kps[R_HIP, 1])])
         if thigh < 0.45 * f.torso:
             return "Sitting"
+
     # When sitting on floor or bench with upright torso
     if aspect > 0.9 and f.sho[1] < f.hip[1]:
         return "Sitting"
+
     return "Standing"
 
 
@@ -353,8 +365,22 @@ def analyse(st: TrackState, f: Frame, classifier=None) -> dict:
         except Exception:
             pass
 
+    # Dynamic posture inference FIRST
+    posture = posture_label(f)
+
+    # Hard guardrail: Suppress "Fall / Syncope" if posture is Bending, Standing, or Sitting, or not lying!
+    # Menunduk is NOT a fall!
+    if posture in ("Bending", "Standing", "Sitting") or not _is_lying(f):
+        scores["Fall / Syncope"] = (0.0, "")
+
     best_name, (best_score, reason) = max(scores.items(), key=lambda kv: kv[1][0])
     symptom = best_name if best_score >= SYMPTOM_THRESHOLD else None
+
+    # Safety check: Never label Fall if not lying
+    if symptom == "Fall / Syncope" and (posture != "Lying" or not _is_lying(f)):
+        symptom = None
+        best_score = 0.0
+        reason = ""
 
     # bookkeeping for persistence-based confirmation
     for name in list(st.symptom_since):
@@ -362,11 +388,6 @@ def analyse(st: TrackState, f: Frame, classifier=None) -> dict:
             del st.symptom_since[name]
     if symptom and symptom not in st.symptom_since:
         st.symptom_since[symptom] = f.t
-
-    # Dynamic posture inference
-    posture = posture_label(f)
-    if (symptom == "Fall / Syncope" or scores.get("Fall / Syncope", (0,))[0] > 0.75) and posture == "Standing":
-        posture = "Lying"
 
     return {
         "posture": posture,

@@ -289,12 +289,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     socket.on('camera_added', (cam) => {
       set((state) => ({ cameras: [...state.cameras, cam] }));
-      toast.success(`Kamera baru ditambahkan: ${cam.id}`);
+      toast.success(`New camera added: ${cam.id}`);
     });
 
     socket.on('camera_deleted', ({ id }) => {
       set((state) => ({ cameras: state.cameras.filter((c) => c.id !== id) }));
-      toast(`Kamera ${id} telah dihapus.`);
+      toast(`Camera ${id} has been removed.`);
     });
 
     socket.on('camera_toggled', ({ id, isActive }) => {
@@ -360,7 +360,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return res.ok;
     } catch {
-      toast.error('Gagal menambah kamera');
+      toast.error('Failed to add camera');
       return false;
     }
   },
@@ -517,8 +517,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
           const showNotif = () => {
             try {
-              const osNotif = new Notification(`🚨 Peringatan Medis: ${symptom}`, {
-                body: `Lokasi: ${cam.name || cameraId}. Segera siapkan jalur IGD / Triage.`,
+              const osNotif = new Notification(`🚨 Medical Alert: ${symptom}`, {
+                body: `Location: ${cam.name || cameraId}. Prepare ER / Triage response immediately.`,
                 icon: '/favicon.ico'
               });
               osNotif.onclick = () => {

@@ -139,7 +139,7 @@ export default function CameraDetailPage() {
       <div className="min-h-screen w-full bg-slate-100 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-4 border-cyan-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-sm font-bold text-slate-600">Memuat data kamera...</span>
+          <span className="text-sm font-bold text-slate-600">Loading camera feed...</span>
         </div>
       </div>
     );
@@ -170,7 +170,7 @@ export default function CameraDetailPage() {
               className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg transition shadow-2xs border border-slate-200"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Kembali ke Dashboard</span>
+              <span>Back to Dashboard</span>
             </Link>
 
             {/* Camera Tag & Title */}
@@ -243,10 +243,10 @@ export default function CameraDetailPage() {
               <button
                 onClick={toggleFullscreen}
                 className="absolute top-4 right-4 z-50 bg-slate-900/90 hover:bg-slate-900 text-white font-bold text-xs px-3.5 py-2 rounded-lg border border-slate-700/80 flex items-center gap-2 shadow-2xl backdrop-blur transition cursor-pointer"
-                title="Keluar dari Layar Penuh"
+                title="Exit Fullscreen"
               >
                 <Minimize2 className="w-4 h-4 text-cyan-400" />
-                <span>Keluar Layar Penuh (ESC)</span>
+                <span>Exit Fullscreen (ESC)</span>
               </button>
             )}
           </div>
@@ -263,17 +263,17 @@ export default function CameraDetailPage() {
                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
                     : 'bg-[#0284c7] hover:bg-[#0369a1] text-white shadow-sky-500/20'
                 }`}
-                title={isWebcamActive ? 'Matikan Kamera' : 'Nyalakan Kamera untuk Deteksi Real-Time'}
+                title={isWebcamActive ? 'Turn Off Camera' : 'Turn On Camera for Real-Time Detection'}
               >
                 {isWebcamActive ? (
                   <>
                     <CameraOff className="w-4 h-4" />
-                    <span>Matikan Kamera</span>
+                    <span>Turn Off Camera</span>
                   </>
                 ) : (
                   <>
                     <Camera className="w-4 h-4" />
-                    <span>Nyalakan Kamera</span>
+                    <span>Turn On Camera</span>
                   </>
                 )}
               </button>
@@ -290,9 +290,9 @@ export default function CameraDetailPage() {
                     }
                   }}
                   className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer max-w-[190px] sm:max-w-[260px] truncate"
-                  title="Pilih Perangkat Input Kamera (Webcam / USB Cam)"
+                  title="Select Camera Input Device (Webcam / USB Cam)"
                 >
-                  <option value="">Pilih Kamera...</option>
+                  <option value="">Select Camera...</option>
                   {availableDevices.map((dev, idx) => (
                     <option key={dev.deviceId || idx} value={dev.deviceId}>
                       {dev.label || `Camera ${idx + 1}`}
@@ -306,10 +306,10 @@ export default function CameraDetailPage() {
                 <button
                   onClick={toggleCameraMirror}
                   className="flex items-center gap-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg border border-slate-300 transition shadow-2xs active:scale-95 cursor-pointer"
-                  title="Ubah Orientasi Kamera (Mirror / Tidak Mirror)"
+                  title="Toggle Camera Orientation (Mirrored / Normal)"
                 >
                   <FlipHorizontal className="w-4 h-4 text-slate-600" />
-                  <span>{isCameraMirrored ? 'Tidak Mirror' : 'Mirror Aktif'}</span>
+                  <span>{isCameraMirrored ? 'Normal View' : 'Mirrored View'}</span>
                 </button>
               )}
 
@@ -317,10 +317,10 @@ export default function CameraDetailPage() {
               <button
                 onClick={toggleFullscreen}
                 className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition shadow-xs active:scale-95 cursor-pointer"
-                title="Buka Video Layar Penuh"
+                title="Open Fullscreen Video"
               >
                 <Maximize2 className="w-4 h-4 text-sky-400" />
-                <span>Layar Penuh</span>
+                <span>Fullscreen</span>
               </button>
             </div>
 
@@ -373,7 +373,7 @@ export default function CameraDetailPage() {
               <span className="text-slate-300">|</span>
 
               <span className="text-[11px] font-mono text-slate-500">
-                LOKASI: <strong className="text-slate-700">{camera.location.toUpperCase()}</strong>
+                LOCATION: <strong className="text-slate-700">{camera.location.toUpperCase()}</strong>
               </span>
 
               <span className="text-slate-300 hidden sm:inline">|</span>
@@ -383,7 +383,7 @@ export default function CameraDetailPage() {
               </span>
             </div>
 
-            {/* Action Buttons (Dispatch, Wheelchair, Riwayat Insiden) */}
+            {/* Action Buttons (Dispatch, Wheelchair, Incident History) */}
             <div className="flex items-center gap-2">
               {camera.hasAlert ? (
                 <button
@@ -391,14 +391,14 @@ export default function CameraDetailPage() {
                   className="bg-[#b91c1c] hover:bg-[#991b1b] text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-sm active:scale-95 flex items-center gap-1.5 animate-bounce"
                 >
                   <AlertTriangle className="w-3.5 h-3.5 text-white" />
-                  <span>Dispatch Tim Medis</span>
+                  <span>Dispatch Medical Team</span>
                 </button>
               ) : camera.actionType === 'wheelchair' ? (
                 <button
                   onClick={handleActionClick}
                   className="bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-sm active:scale-95"
                 >
-                  Bantuan Kursi Roda
+                  Wheelchair Assistance
                 </button>
               ) : null}
 
@@ -407,7 +407,7 @@ export default function CameraDetailPage() {
                 className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3.5 py-2 rounded-lg transition border border-slate-200"
               >
                 <Eye className="w-3.5 h-3.5 text-slate-500" />
-                <span>Riwayat Insiden</span>
+                <span>Incident History</span>
                 <ArrowRight className="w-3 h-3 text-slate-400" />
               </Link>
             </div>
@@ -420,20 +420,20 @@ export default function CameraDetailPage() {
             <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs">
               <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-2">
                 <Monitor className="w-4 h-4 text-[#0284c7]" />
-                <span>Spesifikasi Tampilan & Rasio</span>
+                <span>Display & Ratio Specifications</span>
               </div>
               <ul className="text-[11px] text-slate-600 space-y-1.5">
                 <li className="flex justify-between">
-                  <span>Rasio Tampilan:</span>
+                  <span>Display Ratio:</span>
                   <strong className="text-slate-800">16:9 (Laptop Standard)</strong>
                 </li>
                 <li className="flex justify-between">
-                  <span>Resolusi Canvas:</span>
+                  <span>Canvas Resolution:</span>
                   <strong className="text-slate-800">640 × 360 HD</strong>
                 </li>
                 <li className="flex justify-between">
-                  <span>Dukungan Fullscreen:</span>
-                  <strong className="text-emerald-600">Aktif (W3C Standard)</strong>
+                  <span>Fullscreen Support:</span>
+                  <strong className="text-emerald-600">Active (W3C Standard)</strong>
                 </li>
               </ul>
             </div>
@@ -441,20 +441,20 @@ export default function CameraDetailPage() {
             <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs">
               <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-2">
                 <Sparkles className="w-4 h-4 text-emerald-600" />
-                <span>Model Kecerdasan Buatan</span>
+                <span>Artificial Intelligence Models</span>
               </div>
               <ul className="text-[11px] text-slate-600 space-y-1.5">
                 <li className="flex justify-between">
-                  <span>Arsitektur Pose:</span>
+                  <span>Pose Architecture:</span>
                   <strong className="text-slate-800">YOLO11-Pose (17 Joints)</strong>
                 </li>
                 <li className="flex justify-between">
-                  <span>Deteksi Gejala:</span>
+                  <span>Symptom Detection:</span>
                   <strong className="text-slate-800">Fall, Faint, Pain, Seizure, Stroke</strong>
                 </li>
                 <li className="flex justify-between">
-                  <span>Testing Model:</span>
-                  <strong className="text-[#0284c7]">Tersedia di Navbar Studio</strong>
+                  <span>Model Testing:</span>
+                  <strong className="text-[#0284c7]">Available in Studio Navbar</strong>
                 </li>
               </ul>
             </div>
@@ -466,18 +466,18 @@ export default function CameraDetailPage() {
               </div>
               <ul className="text-[11px] text-slate-600 space-y-1.5">
                 <li className="flex justify-between">
-                  <span>Sumber Kamera:</span>
+                  <span>Camera Source:</span>
                   <strong className="text-slate-800">
                     {isWebcamActive ? 'Live Webcam / USB' : 'Standby Surveillance'}
                   </strong>
                 </li>
                 <li className="flex justify-between">
-                  <span>Protokol Data:</span>
-                  <strong className="text-slate-800">WebSocket real-time</strong>
+                  <span>Data Protocol:</span>
+                  <strong className="text-slate-800">Real-time WebSocket</strong>
                 </li>
                 <li className="flex justify-between">
-                  <span>Keamanan CCTV:</span>
-                  <strong className="text-emerald-600">Enkripsi Internal TLS</strong>
+                  <span>CCTV Security:</span>
+                  <strong className="text-emerald-600">Internal TLS Encryption</strong>
                 </li>
               </ul>
             </div>

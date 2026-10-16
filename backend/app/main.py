@@ -17,7 +17,7 @@ from fastapi import FastAPI, Header, HTTPException, Request, Response, File, Upl
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from .config import PORT
+from .config import CONFIRM_SECONDS, PORT
 from .db import db, now_iso
 from .vision.engine import VisionEngine, draw_snapshot
 
@@ -63,13 +63,13 @@ def get_engine() -> VisionEngine:
 # -------------------------------------------------------------
 def require_auth(authorization: Optional[str] = Header(None)) -> dict[str, Any]:
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Sesi tidak valid atau belum login")
+        raise HTTPException(status_code=401, detail="Invalid session or not authenticated")
     token = authorization.split(" ")[1]
     user = db.find_user_by_token(token)
     if not user:
         raise HTTPException(
             status_code=401,
-            detail="Sesi berakhir atau akun telah login di tempat lain (Single Session Limit)."
+            detail="Session expired or account logged in elsewhere (Single Session Limit)."
         )
     return user
 
@@ -82,12 +82,12 @@ class LoginRequest(BaseModel):
 @fastapi_app.post("/api/auth/login")
 async def api_login(req: LoginRequest):
     if not req.email or not req.password:
-        raise HTTPException(status_code=400, detail="Email dan password wajib diisi")
+        raise HTTPException(status_code=400, detail="Email and password are required")
 
     db.load()
     user = db.find_user_by_email(req.email)
     if not user:
-        raise HTTPException(status_code=401, detail="Email atau password salah")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
     # Verify password with bcrypt
     try:
@@ -96,7 +96,7 @@ async def api_login(req: LoginRequest):
         is_match = False
 
     if not is_match:
-        raise HTTPException(status_code=401, detail="Email atau password salah")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
     new_token = secrets.token_hex(32)
 
@@ -106,7 +106,7 @@ async def api_login(req: LoginRequest):
         for sid in list(active_sockets[user_id]):
             await sio.emit(
                 "session_terminated",
-                {"reason": "Akun Anda baru saja login di sesi browser lain. Sesi lama otomatis ditutup."},
+                {"reason": "Your account has logged in from another browser session. Previous session terminated."},
                 to=sid
             )
 
@@ -115,7 +115,7 @@ async def api_login(req: LoginRequest):
     db.save()
 
     return {
-        "message": "Login berhasil",
+        "message": "Login successful",
         "token": new_token,
         "user": {
             "id": user["id"],
@@ -226,7 +226,7 @@ async def toggle_camera(cam_id: str, authorization: Optional[str] = Header(None)
     db.load()
     cam = db.find_camera(cam_id)
     if not cam:
-        raise HTTPException(status_code=404, detail="Kamera tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Camera not found")
 
     cam["isActive"] = not cam.get("isActive", True)
     db.save()
@@ -279,7 +279,7 @@ async def report_emergency(req: EmergencyReport):
     db.load()
     cam = db.find_camera(req.camera_id)
     if not cam:
-        raise HTTPException(status_code=404, detail="Kamera tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Camera not found")
 
     emergency_id = f"inc-{int(datetime.now().timestamp() * 1000)}"
     now = datetime.now()
@@ -308,7 +308,7 @@ async def report_emergency(req: EmergencyReport):
         "timestamp": timestamp,
         "alert_status": "CRITICAL",
         "bbox_label": req.bbox_label or req.detected_symptom,
-        "notes": "Terdeteksi via Python YOLO-Pose AI Computer Vision Engine.",
+        "notes": "Detected via Python YOLO-Pose AI Computer Vision Engine.",
         "thumbnail_type": req.thumbnail_type,
         "created_at": now_iso()
     }
@@ -333,7 +333,7 @@ async def resolve_emergency(inc_id: str, authorization: Optional[str] = Header(N
     db.load()
     emergency = next((e for e in db.data["emergencies"] if e["id"] == inc_id), None)
     if not emergency:
-        raise HTTPException(status_code=404, detail="Insiden tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Incident not found")
 
     emergency["alert_status"] = "RESOLVED"
     cam_id = emergency["camera_id"]
@@ -363,7 +363,7 @@ async def resolve_camera_emergency(cam_id: str, authorization: Optional[str] = H
     db.load()
     cam = db.find_camera(cam_id)
     if not cam:
-        raise HTTPException(status_code=404, detail="Kamera tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Camera not found")
 
     # Mark all emergencies for this camera as RESOLVED
     for e in db.data.get("emergencies", []):
@@ -572,7 +572,7 @@ async def connect(sid, environ, auth=None):
     if user_id and token and user_id != "guest":
         user = db.find_user(user_id)
         if not user or user.get("active_session_token") != token:
-            await sio.emit("session_terminated", {"reason": "Akun Anda telah login di browser atau perangkat lain."}, to=sid)
+            await sio.emit("session_terminated", {"reason": "Your account has logged in on another browser or device."}, to=sid)
             await sio.disconnect(sid)
             return
 
@@ -632,7 +632,7 @@ async def _cam_inference_worker(cam_id: str):
                     sym = person.get("symptom")
                     sym_score = person.get("symptom_score", 0.0)
                     sym_dur = person.get("symptom_duration", 0.0)
-                    if sym and sym_score >= 0.50 and (person.get("confirmed") or sym_dur >= 1.2):
+                    if sym and sym_score >= 0.55 and person.get("confirmed", False) and sym_dur >= CONFIRM_SECONDS:
                         detected_any_symptom = True
                         last_alert_t = last_cam_alerts.get(cam_id, 0.0)
                         if now_sec - last_alert_t > 6.0:

@@ -16,17 +16,18 @@ import { Toaster } from 'react-hot-toast';
 
 export default function CameraDetailPage() {
   const params = useParams();
-  const { cameras, fetchCameras, openDispatchModal, initRealtime } = useAppStore();
+  const { cameras, fetchCameras, openDispatchModal, initRealtime, initAuth } = useAppStore();
  
   const numericId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const camera = cameras.find((c) => c.numericId === numericId) || cameras[0];
 
   useEffect(() => {
+    initAuth();
     initRealtime();
     if (cameras.length === 0) {
       fetchCameras();
     }
-  }, [cameras.length, fetchCameras, initRealtime]);
+  }, [cameras.length, fetchCameras, initRealtime, initAuth]);
 
   const handleActionClick = () => {
     if (camera) {

@@ -118,7 +118,16 @@ class JsonDB:
         return next((u for u in self.data["users"] if u["id"] == user_id), None)
 
     def find_camera(self, cam_id: str) -> dict | None:
-        return next((c for c in self.data["cameras"] if c["id"] == cam_id), None)
+        if not cam_id:
+            return None
+        target = str(cam_id).strip().lower()
+        return next(
+            (c for c in self.data["cameras"]
+             if c["id"].strip().lower() == target
+             or str(c.get("numericId", "")).strip().lower() == target
+             or c["id"].replace(" ", "").lower() == target.replace(" ", "")),
+            None
+        )
 
 
 db = JsonDB(DB_FILE)

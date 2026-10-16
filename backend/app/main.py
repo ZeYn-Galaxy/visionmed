@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import secrets
+import time
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -533,6 +534,7 @@ async def disconnect(sid):
 # Real-time Computer Vision Frame Stream (Non-blocking & Zero-Lag Buffer Policy)
 active_cam_tasks: set[str] = set()
 latest_cam_frames: dict[str, tuple[str, dict]] = {}
+last_cam_alerts: dict[str, float] = {}
 
 
 async def _cam_inference_worker(cam_id: str):
@@ -561,17 +563,21 @@ async def _cam_inference_worker(cam_id: str):
                     cam["peopleCount"] = p_count
 
                 # Check for confirmed emergency
+                now_sec = time.time()
                 for person in result.get("persons", []):
-                    if person.get("confirmed") and person.get("symptom"):
-                        sym = person["symptom"]
-                        if cam and not cam.get("hasAlert"):
+                    sym = person.get("symptom")
+                    if sym and (person.get("confirmed") or person.get("symptom_duration", 0) >= 0.8 or person.get("confidence", 0) >= 0.7):
+                        last_alert_t = last_cam_alerts.get(cam_id, 0.0)
+                        if now_sec - last_alert_t > 5.0:
+                            last_cam_alerts[cam_id] = now_sec
                             await report_emergency(EmergencyReport(
                                 camera_id=cam_id,
                                 detected_symptom=sym,
-                                status_label=f"Status: {sym} ({person.get('track_id')})",
+                                status_label=f"Status: {sym} (#{person.get('track_id')})",
                                 confidence_score=person.get("confidence", 0.95) * 100,
                                 bbox_label=f"{sym} #{person.get('track_id')}"
                             ))
+
 
                 # Remove internal frame reference before returning
                 result.pop("_frame", None)

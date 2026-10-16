@@ -6,7 +6,7 @@ import { useAppStore } from '../../lib/store';
 import toast from 'react-hot-toast';
 
 export const AlertTeamModal: React.FC = () => {
-  const { isAlertTeamModalOpen, closeAlertTeamModal, stopSiren } = useAppStore();
+  const { isAlertTeamModalOpen, closeAlertTeamModal, stopSiren, activeAlertDetails } = useAppStore();
 
   if (!isAlertTeamModalOpen) return null;
 
@@ -17,6 +17,11 @@ export const AlertTeamModal: React.FC = () => {
     });
     closeAlertTeamModal();
   };
+
+  const symptomText = activeAlertDetails?.symptom || 'Kedaruratan Medis Terdeteksi';
+  const cameraText = activeAlertDetails?.cameraName
+    ? `${activeAlertDetails.cameraId} (${activeAlertDetails.cameraName})`
+    : activeAlertDetails?.cameraId || 'CCTV Surveillance';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-red-950/70 backdrop-blur-sm animate-in fade-in duration-150">
@@ -36,15 +41,19 @@ export const AlertTeamModal: React.FC = () => {
 
         {/* Modal Content */}
         <div className="p-6 space-y-4 text-xs text-slate-700">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-left space-y-1">
-            <div className="font-bold text-red-900 flex items-center gap-1.5">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-left space-y-1.5">
+            <div className="font-bold text-red-900 flex items-center gap-1.5 text-sm">
               <Radio className="w-4 h-4 text-red-600 animate-pulse" />
-              <span>Broadcast Dispatched: Clinical Staff Alert</span>
+              <span>{symptomText}</span>
+            </div>
+            <div className="text-[11px] text-red-800 font-semibold">
+              Lokasi: {cameraText}
             </div>
             <p className="text-gray-600">
               Emergency sirens sound locally. SMS notifications sent to registered triage duty phones. Receptionist desktop notification pushed.
             </p>
           </div>
+
 
           <div className="flex flex-col gap-2 pt-2">
             <button

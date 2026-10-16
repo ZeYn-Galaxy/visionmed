@@ -62,6 +62,8 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({ camera }) => {
   const simulatedAlertRef = useRef<{ personId: string; symptom: string } | null>(null);
   const isStreamingToBackendRef = useRef<boolean>(false);
   const lastStreamTimeRef = useRef<number>(0);
+  const lastAlertTimeRef = useRef<number>(0);
+  const lastAlertSymptomRef = useRef<string>('');
 
   // Enumerate video devices
   const refreshDevices = useCallback(async () => {
@@ -214,15 +216,21 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({ camera }) => {
             trk.status = statusText;
           }
 
-          if (isAlert && !camera.hasAlert) {
-            reportCVDetection(
-              camera.id,
-              p.symptom!,
-              `Status: Emergency Alert (${p.symptom})`,
-              'YOLO11-Pose Multi-Person Model',
-              p.symptom!
-            );
+          if (isAlert && p.symptom) {
+            const tNow = Date.now();
+            if (tNow - lastAlertTimeRef.current > 4000 || lastAlertSymptomRef.current !== p.symptom) {
+              lastAlertTimeRef.current = tNow;
+              lastAlertSymptomRef.current = p.symptom;
+              reportCVDetection(
+                camera.id,
+                p.symptom,
+                `Status: Emergency Alert (${p.symptom})`,
+                'YOLO11-Pose Multi-Person Model',
+                p.symptom
+              );
+            }
           }
+
         });
       }
 
@@ -331,15 +339,21 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({ camera }) => {
                         downwardVelocity: 0,
                         keypoints: p.keypoints?.map(([kx, ky, kc]: [number, number, number]) => [kx * scaleX, ky * scaleY, kc])
                       });
-                      if (isAlert && !camera.hasAlert) {
-                        reportCVDetection(
-                          camera.id,
-                          p.symptom,
-                          `Status: Emergency Alert (${p.symptom})`,
-                          'YOLO11-Pose Multi-Person Model',
-                          p.symptom
-                        );
+                      if (isAlert && p.symptom) {
+                        const tNow = Date.now();
+                        if (tNow - lastAlertTimeRef.current > 4000 || lastAlertSymptomRef.current !== p.symptom) {
+                          lastAlertTimeRef.current = tNow;
+                          lastAlertSymptomRef.current = p.symptom;
+                          reportCVDetection(
+                            camera.id,
+                            p.symptom,
+                            `Status: Emergency Alert (${p.symptom})`,
+                            'YOLO11-Pose Multi-Person Model',
+                            p.symptom
+                          );
+                        }
                       }
+
                     });
                     tracks.forEach((_, id) => {
                       if (!actIds.has(id)) {
@@ -547,15 +561,21 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({ camera }) => {
                     downwardVelocity: 0,
                     keypoints: p.keypoints?.map(([kx, ky, kc]: [number, number, number]) => [kx * scaleX, ky * scaleY, kc])
                   });
-                  if (isAlert && !camera.hasAlert) {
-                    reportCVDetection(
-                      camera.id,
-                      p.symptom,
-                      `Status: Emergency Alert (${p.symptom})`,
-                      'YOLO11-Pose Multi-Person Model',
-                      p.symptom
-                    );
+                  if (isAlert && p.symptom) {
+                    const tNow = Date.now();
+                    if (tNow - lastAlertTimeRef.current > 4000 || lastAlertSymptomRef.current !== p.symptom) {
+                      lastAlertTimeRef.current = tNow;
+                      lastAlertSymptomRef.current = p.symptom;
+                      reportCVDetection(
+                        camera.id,
+                        p.symptom,
+                        `Status: Emergency Alert (${p.symptom})`,
+                        'YOLO11-Pose Multi-Person Model',
+                        p.symptom
+                      );
+                    }
                   }
+
                 });
                 toast.success(`YOLO11-Pose: ${res.people_count} orang terdeteksi (${res.infer_ms}ms)!`, { icon: '🎯' });
               }
@@ -617,15 +637,21 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({ camera }) => {
                       downwardVelocity: 0,
                       keypoints: p.keypoints?.map(([kx, ky, kc]: [number, number, number]) => [kx * scaleX, ky * scaleY, kc])
                     });
-                    if (isAlert && !camera.hasAlert) {
-                      reportCVDetection(
-                        camera.id,
-                        p.symptom,
-                        `Status: Emergency Alert (${p.symptom})`,
-                        'YOLO11-Pose Multi-Person Model',
-                        p.symptom
-                      );
+                    if (isAlert && p.symptom) {
+                      const tNow = Date.now();
+                      if (tNow - lastAlertTimeRef.current > 4000 || lastAlertSymptomRef.current !== p.symptom) {
+                        lastAlertTimeRef.current = tNow;
+                        lastAlertSymptomRef.current = p.symptom;
+                        reportCVDetection(
+                          camera.id,
+                          p.symptom,
+                          `Status: Emergency Alert (${p.symptom})`,
+                          'YOLO11-Pose Multi-Person Model',
+                          p.symptom
+                        );
+                      }
                     }
+
                   });
                   toast.success(`AI Tester [${name}]: ${res.people_count} orang terdeteksi (${res.infer_ms}ms)!`, { icon: '🎯' });
                 }

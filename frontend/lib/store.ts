@@ -11,6 +11,7 @@ interface AppState {
   currentUser: UserProfile | null;
   sessionToken: string | null;
   isLoadingAuth: boolean;
+  initAuth: () => void;
   login: (email: string, password?: string) => Promise<boolean>;
   logout: () => Promise<void>;
 
@@ -40,7 +41,8 @@ interface AppState {
   closeDispatchModal: () => void;
 
   isAlertTeamModalOpen: boolean;
-  openAlertTeamModal: () => void;
+  activeAlertDetails: { cameraId: string; cameraName?: string; symptom: string; timestamp?: string } | null;
+  openAlertTeamModal: (details?: { cameraId: string; cameraName?: string; symptom: string }) => void;
   closeAlertTeamModal: () => void;
 
   isAddCameraModalOpen: boolean;
@@ -60,6 +62,7 @@ interface AppState {
   resolveAlert: (incidentId: string, cameraId: string) => Promise<void>;
   dispatchCamera: (cameraId: string, responder: string, emergencyId?: string) => Promise<void>;
   reportCVDetection: (cameraId: string, symptom: string, statusLabel: string, cvMethod: string, bboxLabel: string) => Promise<void>;
+  triggerEmergencyAlert: (cameraId: string, symptom: string, cameraName?: string) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -75,10 +78,26 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedCameraForDispatch: null,
   isDispatchModalOpen: false,
   isAlertTeamModalOpen: false,
+  activeAlertDetails: null,
   isAddCameraModalOpen: false,
   isMediaTesterModalOpen: false,
 
   setActiveTab: (tab) => set({ activeTab: tab }),
+
+  initAuth: () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const savedToken = localStorage.getItem('visionmed_token');
+      const savedUser = localStorage.getItem('visionmed_user');
+      if (savedToken && savedUser) {
+        set({
+          sessionToken: savedToken,
+          currentUser: JSON.parse(savedUser),
+          isLoadingAuth: false
+        });
+      }
+    } catch {}
+  },
 
   // -------------------------------------------------------------
   // AUTH: Single Account, Single Web Session, No Role Switching
@@ -201,34 +220,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       const { camera_id, detected_symptom } = payload;
       get().fetchCameras();
       get().fetchEmergencies();
-
-      const role = get().currentUser?.role;
-
-      // Role response behavior
-      if (role === 'security') {
-        // Security gets loud Web Audio siren and red visual banner
-        get().startSiren();
-        toast.error(`🚨 ALERT: ${detected_symptom} di ${camera_id}!`, { duration: 6000 });
-      } else if (role === 'receptionist') {
-        // Receptionist gets silent in-app toast + OS Desktop Notification
-        toast(`⚠️ ${detected_symptom} terdeteksi di ${camera_id}`, {
-          icon: '🏥',
-          duration: 6000
-        });
-
-        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-          const osNotif = new Notification(`🚨 Peringatan Medis: ${detected_symptom}`, {
-            body: `Lokasi: ${camera_id}. Segera siapkan jalur IGD / Triage.`,
-            icon: '/favicon.ico',
-            requireInteraction: true
-          });
-          osNotif.onclick = () => {
-            window.focus();
-            window.location.href = '/incidents';
-          };
-        }
-      }
+      get().triggerEmergencyAlert(camera_id, detected_symptom);
     });
+
 
     socket.on('emergency_resolved', () => {
       get().fetchCameras();
@@ -335,6 +329,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   triggerTestAlert: async (cameraId, alertType) => {
+    get().triggerEmergencyAlert(cameraId, alertType);
     try {
       await fetch(`${API_BASE}/emergency`, {
         method: 'POST',
@@ -349,14 +344,20 @@ export const useAppStore = create<AppState>((set, get) => ({
           thumbnail_type: 'collapse'
         })
       });
+      get().fetchCameras();
+      get().fetchEmergencies();
     } catch (err) {
       console.error('Trigger alert error:', err);
     }
   },
 
   reportCVDetection: async (cameraId, symptom, statusLabel, cvMethod, bboxLabel) => {
+    // 1. Immediately sound role alarm & visual alert locally
+    get().triggerEmergencyAlert(cameraId, symptom);
+
+    // 2. Transmit to backend to persist in incident database & broadcast via Socket.IO
     try {
-      await fetch(`${API_BASE}/emergency`, {
+      const res = await fetch(`${API_BASE}/emergency`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -369,8 +370,110 @@ export const useAppStore = create<AppState>((set, get) => ({
           thumbnail_type: 'collapse'
         })
       });
+      if (res.ok) {
+        get().fetchCameras();
+        get().fetchEmergencies();
+      }
     } catch (err) {
       console.error('Report CV detection error:', err);
+    }
+  },
+
+  triggerEmergencyAlert: (cameraId, symptom, cameraName) => {
+    let user = get().currentUser;
+    if (!user && typeof window !== 'undefined') {
+      const savedUser = localStorage.getItem('visionmed_user');
+      if (savedUser) {
+        try {
+          user = JSON.parse(savedUser);
+          set({ currentUser: user });
+        } catch {}
+      }
+    }
+    const role = user?.role || 'security';
+
+    // Prevent duplicate rapid-fire alarms within 2 seconds for identical camera+symptom
+    const now = Date.now();
+    const lastTrigger = (get() as any)._lastEmergencyTriggered || 0;
+    const lastKey = (get() as any)._lastEmergencyKey || '';
+    const currentKey = `${cameraId}-${symptom}`;
+    if (now - lastTrigger < 2000 && lastKey === currentKey) {
+      return;
+    }
+    (get() as any)._lastEmergencyTriggered = now;
+    (get() as any)._lastEmergencyKey = currentKey;
+
+    const cam = get().cameras.find((c) => c.id === cameraId) || { name: cameraName || cameraId };
+    set({
+      activeAlertDetails: {
+        cameraId,
+        cameraName: cam.name,
+        symptom,
+        timestamp: new Date().toLocaleTimeString()
+      }
+    });
+
+    if (role === 'security') {
+      // Security Guard: Loud Web Audio Siren + Visual AlertTeamModal
+      get().startSiren();
+      set({ isAlertTeamModalOpen: true });
+      toast.error(`🚨 ALERT DARURAT: ${symptom} di ${cam.name || cameraId}!`, {
+        id: `alert-${cameraId}`,
+        duration: 8000,
+        style: {
+          background: '#7f1d1d',
+          color: '#ffffff',
+          fontWeight: 'bold',
+          border: '2px solid #ef4444'
+        }
+      });
+    } else if (role === 'receptionist') {
+      // Receptionist: Medical chime + Toast + OS Desktop Notification
+      if (typeof window !== 'undefined') {
+        import('./audioSiren').then((module) => {
+          module.playHospitalChime();
+        });
+      }
+      toast(`⚠️ PERINGATAN MEDIS: ${symptom} terdeteksi di ${cam.name || cameraId}!`, {
+        id: `alert-${cameraId}`,
+        icon: '🏥',
+        duration: 8000,
+        style: {
+          background: '#0369a1',
+          color: '#ffffff',
+          fontWeight: 'bold',
+          border: '2px solid #38bdf8'
+        }
+      });
+
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission === 'granted') {
+          try {
+            const osNotif = new Notification(`🚨 Peringatan Medis: ${symptom}`, {
+              body: `Lokasi: ${cam.name || cameraId}. Segera siapkan jalur IGD / Triage.`,
+              icon: '/favicon.ico',
+              requireInteraction: true
+            });
+            osNotif.onclick = () => {
+              window.focus();
+              window.location.href = '/incidents';
+            };
+          } catch (e) {
+            console.warn('Desktop notification error:', e);
+          }
+        } else if (Notification.permission === 'default') {
+          Notification.requestPermission().then((perm) => {
+            if (perm === 'granted') {
+              new Notification(`🚨 Peringatan Medis: ${symptom}`, {
+                body: `Lokasi: ${cam.name || cameraId}. Segera siapkan jalur IGD / Triage.`,
+                icon: '/favicon.ico'
+              });
+            }
+          });
+        }
+      }
+    } else {
+      toast.error(`🚨 ALERT: ${symptom} di ${cam.name || cameraId}!`, { duration: 6000 });
     }
   },
 
@@ -384,7 +487,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
   closeDispatchModal: () => set({ isDispatchModalOpen: false, selectedCameraForDispatch: null }),
 
-  openAlertTeamModal: () => {
+  openAlertTeamModal: (details) => {
+    if (details) {
+      set({ activeAlertDetails: details });
+    }
     get().startSiren();
     set({ isAlertTeamModalOpen: true });
   },
@@ -415,6 +521,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     set({ isSirenPlaying: false });
   },
+
 
   resolveAlert: async (incidentId, cameraId) => {
     const token = get().sessionToken;

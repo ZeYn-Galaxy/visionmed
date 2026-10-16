@@ -91,7 +91,7 @@ export const Header: React.FC = () => {
           {/* ALERT TEAM Button (Only for Security role) */}
           {currentUser?.role === 'security' && (
             <button
-              onClick={openAlertTeamModal}
+              onClick={() => openAlertTeamModal()}
               className="flex items-center gap-2 bg-[#b91c1c] hover:bg-[#991b1b] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-md transition shadow-sm hover:shadow active:scale-95"
             >
               <ShieldAlert className="w-4 h-4 text-red-200" />

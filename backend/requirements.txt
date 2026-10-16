@@ -4,6 +4,7 @@ uvicorn[standard]==0.34.0
 python-socketio==5.12.1
 bcrypt==4.2.1
 pydantic==2.10.4
+python-multipart>=0.0.9
 
 # --- Computer Vision & ONNX Inference ---
 ultralytics==8.3.58

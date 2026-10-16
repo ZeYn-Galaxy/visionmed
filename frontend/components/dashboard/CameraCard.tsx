@@ -18,7 +18,12 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera }) => {
 
   const handleAction = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (camera.actionType === 'dispatch' || camera.hasAlert) {
+    if (
+      camera.actionType === 'dispatch' ||
+      camera.actionLabel === 'Dispatched' ||
+      camera.badgeType === 'blue' ||
+      camera.hasAlert
+    ) {
       openDispatchModal(camera);
     } else if (camera.actionType === 'wheelchair') {
       openDispatchModal(camera);
@@ -96,7 +101,7 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera }) => {
           <div className="absolute inset-0 pointer-events-none ring-2 ring-inset ring-red-500 shadow-[inset_0_0_35px_rgba(239,68,68,0.55)] z-20 animate-pulse">
             <div className="absolute top-2 left-2 bg-red-600/90 text-white font-mono font-extrabold text-[9px] px-2 py-0.5 rounded tracking-wider flex items-center gap-1 shadow-md animate-bounce">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
-              <span>EMERGENCY DETECTED</span>
+              <span>{camera.actionLabel === 'Dispatched' ? 'DISPATCHED • ACTIVE EMERGENCY' : 'EMERGENCY DETECTED'}</span>
             </div>
           </div>
         )}
@@ -120,7 +125,9 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera }) => {
         <button
           onClick={handleAction}
           className={`text-xs font-bold px-3 py-1 rounded transition active:scale-95 shadow-2xs ${
-            camera.actionType === 'dispatch' || camera.hasAlert
+            camera.actionLabel === 'Dispatched' || camera.badgeType === 'blue'
+              ? 'bg-[#0284c7] hover:bg-[#0369a1] text-white'
+              : camera.actionType === 'dispatch' || camera.hasAlert
               ? 'bg-red-600 hover:bg-red-700 text-white'
               : camera.actionType === 'wheelchair'
               ? 'bg-[#0284c7] hover:bg-[#0369a1] text-white'

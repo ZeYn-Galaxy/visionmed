@@ -25,7 +25,7 @@ interface TestResult {
 }
 
 export const MediaTesterModal: React.FC = () => {
-  const { isMediaTesterModalOpen, closeMediaTesterModal, socket } = useAppStore();
+  const { isMediaTesterModalOpen, closeMediaTesterModal, socket, triggerEmergencyAlert } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<'image' | 'video'>('image');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -33,7 +33,6 @@ export const MediaTesterModal: React.FC = () => {
   const [selectedFileName, setSelectedFileName] = useState<string>('');
 
   // Video streaming state
-  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [isVideoPlaying, setIsVideoPlaying] = useState<boolean>(false);
   const [videoStats, setVideoStats] = useState<{ fps: number; ms: number; peopleCount: number } | null>(null);
@@ -45,6 +44,7 @@ export const MediaTesterModal: React.FC = () => {
   const videoCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isStreamingVideoRef = useRef<boolean>(false);
   const lastVideoFrameTimeRef = useRef<number>(0);
+  const lastTesterAlertTimeRef = useRef<number>(0);
 
   // Clean up video url on unmount or file change
   useEffect(() => {
@@ -64,6 +64,12 @@ export const MediaTesterModal: React.FC = () => {
       isStreamingVideoRef.current = false;
       setVideoStats({ fps: data.fps, ms: data.infer_ms, peopleCount: data.people_count });
       setVideoPersons(data.persons || []);
+
+      const alertPerson = data.persons?.find((p) => Boolean(p.symptom));
+      if (alertPerson && alertPerson.symptom && Date.now() - lastTesterAlertTimeRef.current > 4000) {
+        lastTesterAlertTimeRef.current = Date.now();
+        triggerEmergencyAlert('CAM 01', alertPerson.symptom, 'Tester AI (Video)');
+      }
     };
 
     socket.on('cv_results', handleCVResults);
@@ -151,6 +157,11 @@ export const MediaTesterModal: React.FC = () => {
                 if (data.success) {
                   setVideoStats({ fps: data.fps || 16, ms: data.infer_ms, peopleCount: data.people_count });
                   setVideoPersons(data.persons || []);
+                  const alertPerson = (data.persons as DetectedPerson[])?.find((p) => Boolean(p.symptom));
+                  if (alertPerson && alertPerson.symptom && now - lastTesterAlertTimeRef.current > 4000) {
+                    lastTesterAlertTimeRef.current = now;
+                    triggerEmergencyAlert('CAM 01', alertPerson.symptom, 'Tester AI (Video)');
+                  }
                 }
               })
               .catch(() => {
@@ -252,7 +263,13 @@ export const MediaTesterModal: React.FC = () => {
         if (!res.ok) throw new Error('Inference server error');
         const data: TestResult = await res.json();
         setImageResult(data);
-        toast.success(`Berhasil mendeteksi ${data.people_count} orang dalam ${data.infer_ms}ms!`, { icon: '🎯' });
+        const alertPerson = data.persons?.find((p) => Boolean(p.symptom));
+        if (alertPerson && alertPerson.symptom) {
+          triggerEmergencyAlert('CAM 01', alertPerson.symptom, 'Tester AI (Foto)');
+          toast.error(`🚨 DETEKSI KEDARURATAN AI: ${alertPerson.symptom.toUpperCase()}!`, { duration: 6000 });
+        } else {
+          toast.success(`Berhasil mendeteksi ${data.people_count} orang dalam ${data.infer_ms}ms!`, { icon: '🎯' });
+        }
       } catch (err) {
         console.error(err);
         toast.error('Gagal memproses gambar pada model YOLO backend.');
@@ -282,7 +299,13 @@ export const MediaTesterModal: React.FC = () => {
         });
         const data: TestResult = await res.json();
         setImageResult(data);
-        toast.success(`Foto dianalisis: ${data.people_count} orang terdeteksi (${data.infer_ms}ms)!`, { icon: '🎯' });
+        const alertPerson = data.persons?.find((p) => Boolean(p.symptom));
+        if (alertPerson && alertPerson.symptom) {
+          triggerEmergencyAlert('CAM 01', alertPerson.symptom, 'Tester AI (Foto)');
+          toast.error(`🚨 DETEKSI KEDARURATAN AI: ${alertPerson.symptom.toUpperCase()}!`, { duration: 6000 });
+        } else {
+          toast.success(`Foto dianalisis: ${data.people_count} orang terdeteksi (${data.infer_ms}ms)!`, { icon: '🎯' });
+        }
         setIsProcessing(false);
       };
       reader.readAsDataURL(blob);
@@ -291,11 +314,6 @@ export const MediaTesterModal: React.FC = () => {
       toast.error('Gagal memuat foto sampel.');
       setIsProcessing(false);
     }
-  };
-
-  // Default sample image loader
-  const handleUseSampleImage = () => {
-    handleUsePresetImage('/samples/test_crowd.jpg', 'Sampel 4 Orang (COCO)');
   };
 
   // Video file upload
@@ -308,7 +326,6 @@ export const MediaTesterModal: React.FC = () => {
     }
 
     const url = URL.createObjectURL(file);
-    setVideoFile(file);
     setVideoUrl(url);
     setSelectedFileName(file.name);
     setIsVideoPlaying(true);

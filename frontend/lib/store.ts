@@ -2,9 +2,19 @@ import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
 import { CameraFeed, IncidentRecord, UrgentAlert, UserProfile } from '../types';
 import toast from 'react-hot-toast';
+import {
+  playSiren,
+  stopSiren as stopSirenAudio,
+  muteSiren as muteSirenAudio,
+  unmuteSiren as unmuteSirenAudio,
+  playHospitalChime
+} from './audioSiren';
 
 const API_BASE = 'http://localhost:5000/api';
 const SOCKET_URL = 'http://localhost:5000';
+const notifiedEmergencyKeys = new Set<string>();
+let lastEmergencyTriggeredTime = 0;
+let lastEmergencyTriggeredKey = '';
 
 interface AppState {
   // Auth state
@@ -53,10 +63,13 @@ interface AppState {
   openMediaTesterModal: () => void;
   closeMediaTesterModal: () => void;
 
-  // Audio Siren
+  // Audio Siren & Mute Controls
   isSirenPlaying: boolean;
+  isSirenMuted: boolean;
   startSiren: () => void;
   stopSiren: () => void;
+  muteSiren: () => void;
+  unmuteSiren: () => void;
 
   // Active Webcam sync between Detail & Dashboard
   activeWebcamCameraId: string | null;
@@ -66,8 +79,14 @@ interface AppState {
   // Dismiss Active Alert Banner
   dismissActiveAlert: () => void;
 
+  // Mirror & People tracking
+  isCameraMirrored: boolean;
+  toggleCameraMirror: () => void;
+  updateCameraPeopleCount: (cameraId: string, count: number) => void;
+
   // Actions
   resolveAlert: (incidentId: string, cameraId: string) => Promise<void>;
+  resolveCameraAlert: (cameraId: string) => Promise<void>;
   dispatchCamera: (cameraId: string, responder: string, emergencyId?: string) => Promise<void>;
   reportCVDetection: (cameraId: string, symptom: string, statusLabel: string, cvMethod: string, bboxLabel: string) => Promise<void>;
   triggerEmergencyAlert: (cameraId: string, symptom: string, cameraName?: string) => void;
@@ -83,6 +102,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeTab: 'all',
   socket: null,
   isSirenPlaying: false,
+  isSirenMuted: false,
   selectedCameraForDispatch: null,
   isDispatchModalOpen: false,
   isAlertTeamModalOpen: false,
@@ -92,10 +112,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeWebcamCameraId: null,
   activeWebcamDeviceId: null,
   setActiveWebcam: (cameraId, deviceId) =>
-    set({
+    set((state) => ({
       activeWebcamCameraId: cameraId,
-      activeWebcamDeviceId: deviceId || null
-    }),
+      activeWebcamDeviceId: deviceId || null,
+      cameras: state.cameras.map((c) =>
+        cameraId && c.id === cameraId ? c : { ...c, peopleCount: 0 }
+      )
+    })),
+  isCameraMirrored: true,
+  toggleCameraMirror: () => set((state) => ({ isCameraMirrored: !state.isCameraMirrored })),
+  updateCameraPeopleCount: (cameraId, count) => {
+    const activeId = get().activeWebcamCameraId;
+    set((state) => ({
+      cameras: state.cameras.map((c) =>
+        c.id === cameraId ? { ...c, peopleCount: activeId === cameraId ? count : 0 } : c
+      )
+    }));
+  },
   dismissActiveAlert: () => set({ activeAlertDetails: null }),
 
   setActiveTab: (tab) => set({ activeTab: tab }),
@@ -145,19 +178,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().fetchCameras();
       get().fetchEmergencies();
 
-      // Trigger Web Notifications API for Receptionist immediately upon login
+      // Request Web Notifications permission for Receptionist silently
       if (data.user.role === 'receptionist') {
-        if (typeof window !== 'undefined' && 'Notification' in window) {
-          if (Notification.permission === 'default') {
-            Notification.requestPermission().then((perm) => {
-              if (perm === 'granted') {
-                new Notification('VisionMed Receptionist Mode', {
-                  body: 'Notifikasi insiden kritis desktop aktif.',
-                  icon: '/favicon.ico'
-                });
-              }
-            });
-          }
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission().catch(() => {});
         }
       }
 
@@ -243,9 +267,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     socket.on('emergency_resolved', (payload?: { camera_id?: string }) => {
       get().fetchCameras();
       get().fetchEmergencies();
+      stopSirenAudio();
+      set({ isSirenPlaying: false });
       if (!payload?.camera_id || get().activeAlertDetails?.cameraId === payload.camera_id) {
         get().dismissActiveAlert();
       }
+      if (payload?.camera_id) {
+        for (const key of Array.from(notifiedEmergencyKeys)) {
+          if (key.startsWith(payload.camera_id)) {
+            notifiedEmergencyKeys.delete(key);
+          }
+        }
+      }
+    });
+
+    socket.on('people_count_updated', ({ camera_id, people_count }: { camera_id: string; people_count: number }) => {
+      set((state) => ({
+        cameras: state.cameras.map((c) => (c.id === camera_id ? { ...c, peopleCount: people_count } : c))
+      }));
     });
 
     socket.on('camera_added', (cam) => {
@@ -275,7 +314,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       const res = await fetch(`${API_BASE}/cameras`);
       if (res.ok) {
         const cameras: CameraFeed[] = await res.json();
-        const urgent = cameras
+        const activeId = get().activeWebcamCameraId;
+        const normalizedCameras = cameras.map((c) => ({
+          ...c,
+          peopleCount: activeId && activeId === c.id ? c.peopleCount || 0 : 0
+        }));
+        const urgent = normalizedCameras
           .filter((c) => c.hasAlert)
           .map((c) => ({
             id: 'alert-' + c.id,
@@ -284,7 +328,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             message: c.alertType || 'Medical alert triggered',
             timeAgo: 'Just now'
           }));
-        set({ cameras, urgentAlerts: urgent });
+        set({ cameras: normalizedCameras, urgentAlerts: urgent });
       }
     } catch (err) {
       console.error('Fetch cameras error:', err);
@@ -413,24 +457,49 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // Prevent duplicate rapid-fire alarms within 2 seconds for identical camera+symptom
     const now = Date.now();
-    const lastTrigger = (get() as any)._lastEmergencyTriggered || 0;
-    const lastKey = (get() as any)._lastEmergencyKey || '';
     const currentKey = `${cameraId}-${symptom}`;
-    if (now - lastTrigger < 2000 && lastKey === currentKey) {
+    if (now - lastEmergencyTriggeredTime < 2000 && lastEmergencyTriggeredKey === currentKey) {
       return;
     }
-    (get() as any)._lastEmergencyTriggered = now;
-    (get() as any)._lastEmergencyKey = currentKey;
+    lastEmergencyTriggeredTime = now;
+    lastEmergencyTriggeredKey = currentKey;
 
     const cam = get().cameras.find((c) => c.id === cameraId) || { name: cameraName || cameraId };
-    set({
+    set((state) => ({
       activeAlertDetails: {
         cameraId,
         cameraName: cam.name,
         symptom,
         timestamp: new Date().toLocaleTimeString()
-      }
-    });
+      },
+      // Immediately illuminate camera ambient glow & badge in store
+      cameras: state.cameras.map((c) =>
+        c.id === cameraId
+          ? {
+              ...c,
+              hasAlert: true,
+              alertType: symptom,
+              badgeType: c.actionLabel === 'Dispatched' ? 'blue' : 'red',
+              badgeText: c.actionLabel === 'Dispatched' ? c.badgeText : `• ${symptom}`,
+              statusText: c.actionLabel === 'Dispatched' ? c.statusText : `Status: Critical ${symptom}`,
+              actionType: 'dispatch',
+              actionLabel: c.actionLabel === 'Dispatched' ? 'Dispatched' : 'Dispatch'
+            }
+          : c
+      ),
+      urgentAlerts: [
+        {
+          id: 'alert-' + cameraId,
+          cameraId,
+          cameraName: cam.name || cameraId,
+          message: symptom,
+          timeAgo: 'Just now'
+        },
+        ...state.urgentAlerts.filter((a) => a.cameraId !== cameraId)
+      ],
+      // Unmute so newly detected emergency sounds immediately
+      isSirenMuted: false
+    }));
 
     if (role === 'security') {
       // Security Guard: Web Audio Siren (No full-screen modal popup; ambient glow + top-right swipeable banner)
@@ -438,35 +507,44 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else if (role === 'receptionist') {
       // Receptionist: Medical chime + OS Desktop Notification
       if (typeof window !== 'undefined') {
-        import('./audioSiren').then((module) => {
-          module.playHospitalChime();
-        });
+        playHospitalChime();
       }
 
       if (typeof window !== 'undefined' && 'Notification' in window) {
-        if (Notification.permission === 'granted') {
-          try {
-            const osNotif = new Notification(`🚨 Peringatan Medis: ${symptom}`, {
-              body: `Lokasi: ${cam.name || cameraId}. Segera siapkan jalur IGD / Triage.`,
-              icon: '/favicon.ico',
-              requireInteraction: true
-            });
-            osNotif.onclick = () => {
-              window.focus();
-              window.location.href = '/incidents';
-            };
-          } catch (e) {
-            console.warn('Desktop notification error:', e);
-          }
-        } else if (Notification.permission === 'default') {
-          Notification.requestPermission().then((perm) => {
-            if (perm === 'granted') {
-              new Notification(`🚨 Peringatan Medis: ${symptom}`, {
+        const notifKey = `${cameraId}-${symptom}`;
+        if (!notifiedEmergencyKeys.has(notifKey)) {
+          notifiedEmergencyKeys.add(notifKey);
+
+          const showNotif = () => {
+            try {
+              const osNotif = new Notification(`🚨 Peringatan Medis: ${symptom}`, {
                 body: `Lokasi: ${cam.name || cameraId}. Segera siapkan jalur IGD / Triage.`,
                 icon: '/favicon.ico'
               });
+              osNotif.onclick = () => {
+                window.focus();
+                window.location.href = '/incidents';
+              };
+              // Auto close after 4.5s to avoid permanent desktop clutter
+              setTimeout(() => {
+                try {
+                  osNotif.close();
+                } catch {}
+              }, 4500);
+            } catch (e) {
+              console.warn('Desktop notification error:', e);
             }
-          });
+          };
+
+          if (Notification.permission === 'granted') {
+            showNotif();
+          } else if (Notification.permission === 'default') {
+            Notification.requestPermission().then((perm) => {
+              if (perm === 'granted') {
+                showNotif();
+              }
+            });
+          }
         }
       }
     } else {
@@ -503,41 +581,72 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeMediaTesterModal: () => set({ isMediaTesterModalOpen: false }),
 
   startSiren: () => {
-    if (typeof window !== 'undefined') {
-      import('./audioSiren').then((module) => {
-        module.playSiren();
-      });
-    }
-    set({ isSirenPlaying: true });
+    unmuteSirenAudio();
+    playSiren();
+    set({ isSirenPlaying: true, isSirenMuted: false });
   },
   stopSiren: () => {
-    if (typeof window !== 'undefined') {
-      import('./audioSiren').then((module) => {
-        module.stopSiren();
-      });
-    }
-    set({ isSirenPlaying: false });
+    stopSirenAudio();
+    muteSirenAudio();
+    set({ isSirenPlaying: false, isSirenMuted: true });
+  },
+  muteSiren: () => {
+    stopSirenAudio();
+    muteSirenAudio();
+    set({ isSirenPlaying: false, isSirenMuted: true });
+  },
+  unmuteSiren: () => {
+    unmuteSirenAudio();
+    set({ isSirenMuted: false });
   },
 
-
-  resolveAlert: async (incidentId, cameraId) => {
+  resolveCameraAlert: async (cameraId: string) => {
     const token = get().sessionToken;
     try {
-      await fetch(`${API_BASE}/emergency/${incidentId}/resolve`, {
+      await fetch(`${API_BASE}/cameras/${encodeURIComponent(cameraId)}/resolve`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
-      console.log(`Alert resolved for camera ${cameraId}`);
-      get().fetchCameras();
-      get().fetchEmergencies();
+      stopSirenAudio();
+      unmuteSirenAudio();
+      set({ isSirenPlaying: false, isSirenMuted: false });
+      get().dismissActiveAlert();
+      await get().fetchCameras();
+      await get().fetchEmergencies();
     } catch (err) {
-      console.error(err);
+      console.error('Resolve camera alert error:', err);
     }
+  },
+
+  resolveAlert: async (incidentId, cameraId) => {
+    await get().resolveCameraAlert(cameraId);
   },
 
   dispatchCamera: async (cameraId, responder, emergencyId) => {
     const token = get().sessionToken;
     try {
+      // 1. Locally mark camera as Dispatched while preserving active emergency alert
+      set((state) => ({
+        cameras: state.cameras.map((c) =>
+          c.id === cameraId
+            ? {
+                ...c,
+                hasAlert: true,
+                badgeType: 'blue',
+                badgeText: `• Dispatched (${responder})`,
+                statusText: `🚨 ${c.alertType || 'Emergency'} (Dispatched: ${responder})`,
+                actionLabel: 'Dispatched'
+              }
+            : c
+        ),
+        isSirenMuted: false,
+        isSirenPlaying: true
+      }));
+
+      // Ensure siren sounds continuously until solved or muted
+      unmuteSirenAudio();
+      get().startSiren();
+
       await fetch(`${API_BASE}/dispatch`, {
         method: 'POST',
         headers: {

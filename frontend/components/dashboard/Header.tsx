@@ -3,15 +3,18 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ShieldAlert, VolumeX, Camera, LogOut, ChevronDown, Lock, FlaskConical } from 'lucide-react';
+import { VolumeX, Volume2, Camera, LogOut, ChevronDown, Lock, FlaskConical, CheckCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAppStore } from '../../lib/store';
 
 export const Header: React.FC = () => {
   const router = useRouter();
   const {
-    openAlertTeamModal,
     isSirenPlaying,
+    isSirenMuted,
     stopSiren,
+    unmuteSiren,
+    resolveCameraAlert,
     openAddCameraModal,
     openMediaTesterModal,
     currentUser,
@@ -30,8 +33,8 @@ export const Header: React.FC = () => {
   };
 
   return (
-    <header className="w-full bg-white border-b border-slate-200/80 px-4 sm:px-8 py-3.5 sticky top-0 z-40 shadow-xs">
-      <div className="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-4">
+    <header className="w-full bg-white border-b border-slate-200/80 px-4 sm:px-8 h-16 sticky top-0 z-40 shadow-xs flex items-center">
+      <div className="max-w-[1600px] w-full mx-auto flex items-center justify-between gap-3">
         {/* Brand & Live Status */}
         <div className="flex items-center gap-3.5">
           <Link href="/" className="flex items-center gap-2.5 group">
@@ -80,7 +83,7 @@ export const Header: React.FC = () => {
           {isSirenPlaying && (
             <button
               onClick={stopSiren}
-              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-md transition shadow animate-bounce"
+              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-md transition shadow animate-pulse"
               title="Silence Active Audio Siren"
             >
               <VolumeX className="w-3.5 h-3.5" />
@@ -88,14 +91,40 @@ export const Header: React.FC = () => {
             </button>
           )}
 
-          {/* ALERT TEAM Button (Only for Security role) */}
-          {currentUser?.role === 'security' && (
+          {/* Siren Muted status & unmute action */}
+          {isSirenMuted && !isSirenPlaying && (
             <button
-              onClick={() => openAlertTeamModal()}
-              className="flex items-center gap-2 bg-[#b91c1c] hover:bg-[#991b1b] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-md transition shadow-sm hover:shadow active:scale-95"
+              onClick={unmuteSiren}
+              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 py-2 rounded-md transition border border-slate-700 shadow-xs"
+              title="Siren audio is muted. Click to re-enable siren audio."
             >
-              <ShieldAlert className="w-4 h-4 text-red-200" />
-              <span>ALERT TEAM</span>
+              <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>SIREN MUTED (UNMUTE)</span>
+            </button>
+          )}
+
+          {/* Quick SOLVE / SELESAI button for Security when alert or siren is active */}
+          {currentUser?.role === 'security' && (cameras.some((c) => c.hasAlert) || isSirenPlaying) && (
+            <button
+              onClick={async () => {
+                const alertCams = cameras.filter((c) => c.hasAlert);
+                if (alertCams.length > 0) {
+                  for (const cam of alertCams) {
+                    await resolveCameraAlert(cam.id);
+                  }
+                } else {
+                  stopSiren();
+                }
+                toast.success('Konfirmasi Security: Masalah dinyatakan SOLVED (Selesai). Alarm dimatikan.', {
+                  icon: '✅',
+                  duration: 4000
+                });
+              }}
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-md transition shadow-xs hover:shadow active:scale-95 animate-pulse"
+              title="Konfirmasi Security: Tandai masalah selesai (Solve) dan matikan alarm"
+            >
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-200" />
+              <span>SOLVED (SELESAI)</span>
             </button>
           )}
 

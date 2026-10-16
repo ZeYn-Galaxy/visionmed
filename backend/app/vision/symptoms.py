@@ -71,40 +71,64 @@ class TrackState:
 
 def _is_lying(f: Frame) -> bool:
     x1, y1, x2, y2 = f.bbox
-    aspect = (x2 - x1) / max(y2 - y1, 1.0)
+    bw = max(x2 - x1, 1.0)
+    bh = max(y2 - y1, 1.0)
+    aspect = bw / bh
+
     # Check if legs are extended vertically downwards (standing or bending)
     has_legs = visible(f.kps, L_ANK) or visible(f.kps, R_ANK) or visible(f.kps, L_KNE) or visible(f.kps, R_KNE)
     if has_legs:
         low_pt = max(f.kps[L_ANK, 1], f.kps[R_ANK, 1], f.kps[L_KNE, 1], f.kps[R_KNE, 1])
-        if low_pt > f.hip[1] + 0.5 * f.torso and aspect < 1.15:
+        # If legs/feet extend well below hips, the person is supported by legs (Standing, Bending, or Sitting)
+        if low_pt > f.hip[1] + 0.35 * f.torso:
             return False
+
+    # Hip height relative to bottom of bounding box:
+    # When standing or bending, hips are suspended high above the ground (usually 38% - 60% of bbox height).
+    # When truly lying down on the ground, hips rest on or near the floor (< 32% of bbox height).
+    dist_hip_to_ground = y2 - f.hip[1]
+    if dist_hip_to_ground > 0.38 * bh:
+        return False
+
     # Upright head keypoints (head clearly above shoulders) means sitting/standing upright
     head_indices = (NOSE, L_EYE, R_EYE, L_EAR, R_EAR)
     head_y_pts = [f.kps[i, 1] for i in head_indices if f.kps[i, 2] >= 0.35]
     if head_y_pts and min(head_y_pts) < f.sho[1] - 0.10 * f.torso and f.angle < 50:
         return False
+
     # Upright torso with shoulders well above hips means sitting/standing, NOT lying
     if f.angle < 45 and f.sho[1] < f.hip[1] - 0.15 * f.torso:
         return False
-    return (aspect > 1.25 and f.angle > 40) or (f.angle > 65 and abs(f.sho[1] - f.hip[1]) < 0.35 * f.torso)
+
+    # Lying requires flat horizontal torso or wide aspect ratio AND hips near floor
+    is_flat_torso = f.angle > 60 and abs(f.sho[1] - f.hip[1]) < 0.35 * f.torso
+    return (aspect > 1.25 and f.angle > 50) or (is_flat_torso and dist_hip_to_ground <= 0.35 * bh)
 
 
 
 def detect_fall(st: TrackState, f: Frame) -> tuple[float, str]:
     win = st.window(1.5)
     if len(win) >= 3:
-        drop = (f.sho[1] - min(w.sho[1] for w in win)) / f.torso
-        if drop > 1.0:
+        # Measure shoulder descent AND hip descent
+        sho_drop = (f.sho[1] - min(w.sho[1] for w in win)) / f.torso
+        hip_drop = (f.hip[1] - min(w.hip[1] for w in win)) / f.torso
+        # In a real collapse, both shoulders and hips drop rapidly towards floor
+        if sho_drop > 0.9 and hip_drop > 0.45:
             st.last_descent_t = f.t
+
+    # Must be verified lying on the floor
     if not _is_lying(f):
         return 0.0, ""
+
     lying = st.window(2.0)
     lying_ratio = np.mean([_is_lying(w) for w in lying]) if lying else 0
-    if f.t - st.last_descent_t < 4.0 and lying_ratio > 0.6:
-        return 0.92, "rapid descent then horizontal posture"
+    if f.t - st.last_descent_t < 4.0 and lying_ratio > 0.65:
+        return 0.92, "rapid collapse to floor with horizontal posture"
+
     long_lying = st.window(5.0)
-    if len(long_lying) > 5 and long_lying[-1].t - long_lying[0].t > 4 and np.mean([_is_lying(w) for w in long_lying]) > 0.85:
-        return 0.72, "person lying on the floor > 4s"
+    if len(long_lying) > 8 and long_lying[-1].t - long_lying[0].t > 4.0 and np.mean([_is_lying(w) for w in long_lying]) > 0.85:
+        return 0.75, "person lying motionless on floor > 4s"
+
     return 0.0, ""
 
 

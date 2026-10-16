@@ -16,11 +16,11 @@ import {
   Minimize2,
   Cpu,
   MapPin,
-  Clock,
   Sparkles,
   CheckCircle2,
   AlertTriangle,
-  Monitor
+  Monitor,
+  FlipHorizontal
 } from 'lucide-react';
 import { Header } from '../../../components/dashboard/Header';
 import { Footer } from '../../../components/dashboard/Footer';
@@ -40,10 +40,15 @@ export default function CameraDetailPage() {
     openDispatchModal,
     initRealtime,
     initAuth,
+    currentUser,
     activeWebcamCameraId,
     activeWebcamDeviceId,
-    setActiveWebcam
+    setActiveWebcam,
+    isCameraMirrored,
+    toggleCameraMirror
   } = useAppStore();
+
+  const isAdmin = currentUser?.role === 'admin';
 
   const numericId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const camera = cameras.find((c) => c.numericId === numericId) || cameras[0];
@@ -187,17 +192,19 @@ export default function CameraDetailPage() {
                 </h1>
                 <span className="text-[11px] text-slate-500 flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-slate-400" />
-                  {camera.location} • Hospital Surveillance Network
+                  {camera.location} • Hospital Network
                 </span>
               </div>
             </div>
 
-            {/* Status Pill & 16:9 Indicator */}
+            {/* Status Pill & 16:9 Indicator (16:9 for Admin only) */}
             <div className="flex items-center gap-2">
-              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                <Monitor className="w-3 h-3 text-slate-500" />
-                16:9 HD Ratio
-              </span>
+              {isAdmin && (
+                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                  <Monitor className="w-3 h-3 text-slate-500" />
+                  16:9 HD Ratio
+                </span>
+              )}
               <span
                 className={`text-xs font-bold px-3 py-1 rounded-full ${
                   camera.badgeType === 'red'
@@ -294,11 +301,23 @@ export default function CameraDetailPage() {
                 </select>
               </div>
 
+              {/* Camera Mirror / Unmirror Toggle (Admin only) */}
+              {isAdmin && (
+                <button
+                  onClick={toggleCameraMirror}
+                  className="flex items-center gap-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg border border-slate-300 transition shadow-2xs active:scale-95 cursor-pointer"
+                  title="Ubah Orientasi Kamera (Mirror / Tidak Mirror)"
+                >
+                  <FlipHorizontal className="w-4 h-4 text-slate-600" />
+                  <span>{isCameraMirrored ? 'Tidak Mirror' : 'Mirror Aktif'}</span>
+                </button>
+              )}
+
               {/* Fullscreen Video Button */}
               <button
                 onClick={toggleFullscreen}
                 className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition shadow-xs active:scale-95 cursor-pointer"
-                title="Buka Video Layar Penuh (16:9)"
+                title="Buka Video Layar Penuh"
               >
                 <Maximize2 className="w-4 h-4 text-sky-400" />
                 <span>Layar Penuh</span>
@@ -307,7 +326,7 @@ export default function CameraDetailPage() {
 
             {/* Right Telemetry: FPS, Model, Status Pill */}
             <div className="flex items-center gap-2 flex-wrap">
-              {isWebcamActive && inferStats && (
+              {isAdmin && isWebcamActive && inferStats && (
                 <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] font-mono text-slate-700">
                   <Cpu className="w-3.5 h-3.5 text-cyan-600" />
                   <span>YOLO11:</span>
@@ -395,73 +414,75 @@ export default function CameraDetailPage() {
           </div>
         </div>
 
-        {/* Technical Diagnostics & Specifications Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs">
-            <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-2">
-              <Monitor className="w-4 h-4 text-[#0284c7]" />
-              <span>Spesifikasi Tampilan & Rasio</span>
+        {/* Technical Diagnostics & Specifications Cards Grid (Admin Only) */}
+        {isAdmin && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs">
+              <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-2">
+                <Monitor className="w-4 h-4 text-[#0284c7]" />
+                <span>Spesifikasi Tampilan & Rasio</span>
+              </div>
+              <ul className="text-[11px] text-slate-600 space-y-1.5">
+                <li className="flex justify-between">
+                  <span>Rasio Tampilan:</span>
+                  <strong className="text-slate-800">16:9 (Laptop Standard)</strong>
+                </li>
+                <li className="flex justify-between">
+                  <span>Resolusi Canvas:</span>
+                  <strong className="text-slate-800">640 × 360 HD</strong>
+                </li>
+                <li className="flex justify-between">
+                  <span>Dukungan Fullscreen:</span>
+                  <strong className="text-emerald-600">Aktif (W3C Standard)</strong>
+                </li>
+              </ul>
             </div>
-            <ul className="text-[11px] text-slate-600 space-y-1.5">
-              <li className="flex justify-between">
-                <span>Rasio Tampilan:</span>
-                <strong className="text-slate-800">16:9 (Laptop Standard)</strong>
-              </li>
-              <li className="flex justify-between">
-                <span>Resolusi Canvas:</span>
-                <strong className="text-slate-800">640 × 360 HD</strong>
-              </li>
-              <li className="flex justify-between">
-                <span>Dukungan Fullscreen:</span>
-                <strong className="text-emerald-600">Aktif (W3C Standard)</strong>
-              </li>
-            </ul>
-          </div>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs">
-            <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-2">
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              <span>Model Kecerdasan Buatan</span>
+            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs">
+              <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-2">
+                <Sparkles className="w-4 h-4 text-emerald-600" />
+                <span>Model Kecerdasan Buatan</span>
+              </div>
+              <ul className="text-[11px] text-slate-600 space-y-1.5">
+                <li className="flex justify-between">
+                  <span>Arsitektur Pose:</span>
+                  <strong className="text-slate-800">YOLO11-Pose (17 Joints)</strong>
+                </li>
+                <li className="flex justify-between">
+                  <span>Deteksi Gejala:</span>
+                  <strong className="text-slate-800">Fall, Faint, Pain, Seizure, Stroke</strong>
+                </li>
+                <li className="flex justify-between">
+                  <span>Testing Model:</span>
+                  <strong className="text-[#0284c7]">Tersedia di Navbar Studio</strong>
+                </li>
+              </ul>
             </div>
-            <ul className="text-[11px] text-slate-600 space-y-1.5">
-              <li className="flex justify-between">
-                <span>Arsitektur Pose:</span>
-                <strong className="text-slate-800">YOLO11-Pose (17 Joints)</strong>
-              </li>
-              <li className="flex justify-between">
-                <span>Deteksi Gejala:</span>
-                <strong className="text-slate-800">Fall, Faint, Pain, Seizure, Stroke</strong>
-              </li>
-              <li className="flex justify-between">
-                <span>Testing Model:</span>
-                <strong className="text-[#0284c7]">Tersedia di Navbar Studio</strong>
-              </li>
-            </ul>
-          </div>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs">
-            <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-2">
-              <CheckCircle2 className="w-4 h-4 text-cyan-600" />
-              <span>Surveillance Telemetry</span>
+            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs">
+              <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-2">
+                <CheckCircle2 className="w-4 h-4 text-cyan-600" />
+                <span>Surveillance Telemetry</span>
+              </div>
+              <ul className="text-[11px] text-slate-600 space-y-1.5">
+                <li className="flex justify-between">
+                  <span>Sumber Kamera:</span>
+                  <strong className="text-slate-800">
+                    {isWebcamActive ? 'Live Webcam / USB' : 'Standby Surveillance'}
+                  </strong>
+                </li>
+                <li className="flex justify-between">
+                  <span>Protokol Data:</span>
+                  <strong className="text-slate-800">WebSocket real-time</strong>
+                </li>
+                <li className="flex justify-between">
+                  <span>Keamanan CCTV:</span>
+                  <strong className="text-emerald-600">Enkripsi Internal TLS</strong>
+                </li>
+              </ul>
             </div>
-            <ul className="text-[11px] text-slate-600 space-y-1.5">
-              <li className="flex justify-between">
-                <span>Sumber Kamera:</span>
-                <strong className="text-slate-800">
-                  {isWebcamActive ? 'Live Webcam / USB' : 'Standby Surveillance'}
-                </strong>
-              </li>
-              <li className="flex justify-between">
-                <span>Protokol Data:</span>
-                <strong className="text-slate-800">WebSocket real-time</strong>
-              </li>
-              <li className="flex justify-between">
-                <span>Keamanan CCTV:</span>
-                <strong className="text-emerald-600">Enkripsi Internal TLS</strong>
-              </li>
-            </ul>
           </div>
-        </div>
+        )}
       </main>
 
       {/* Full-Width Footer */}

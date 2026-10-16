@@ -157,7 +157,11 @@ async def api_logout(authorization: Optional[str] = Header(None)):
 @fastapi_app.get("/api/cameras")
 async def get_cameras():
     db.load()
-    return db.data.get("cameras", [])
+    cams = db.data.get("cameras", [])
+    for c in cams:
+        if c.get("id") not in active_cam_tasks:
+            c["peopleCount"] = 0
+    return cams
 
 
 class AddCameraRequest(BaseModel):
@@ -240,6 +244,26 @@ async def get_emergencies():
     return db.data.get("emergencies", [])
 
 
+@fastapi_app.delete("/api/emergencies")
+async def clear_all_emergencies():
+    db.load()
+    db.data["emergencies"] = []
+    db.data["dispatches"] = []
+    for cam in db.data.get("cameras", []):
+        cam["hasAlert"] = False
+        cam["alertType"] = None
+        cam["bboxLabel"] = None
+        cam["badgeText"] = "• Normal"
+        cam["badgeType"] = "green"
+        cam["statusText"] = "Status: Normal"
+        cam["actionType"] = "view"
+        cam["actionLabel"] = "View"
+        cam["isDispatched"] = False
+    db.save()
+    await sio.emit("emergency_resolved", {})
+    return {"success": True, "message": "All incident logs cleared"}
+
+
 class EmergencyReport(BaseModel):
     camera_id: str
     detected_symptom: str
@@ -265,11 +289,12 @@ async def report_emergency(req: EmergencyReport):
     cam["hasAlert"] = True
     cam["alertType"] = req.detected_symptom
     cam["bboxLabel"] = req.bbox_label or req.detected_symptom
-    cam["badgeText"] = f"• {req.detected_symptom}"
-    cam["badgeType"] = "red"
-    cam["statusText"] = req.status_label or "Status: Critical"
-    cam["actionType"] = "dispatch"
-    cam["actionLabel"] = "Dispatch"
+    if not cam.get("isDispatched"):
+        cam["badgeText"] = f"• {req.detected_symptom}"
+        cam["badgeType"] = "red"
+        cam["statusText"] = req.status_label or "Status: Critical"
+        cam["actionType"] = "dispatch"
+        cam["actionLabel"] = "Dispatch"
 
     new_emergency = {
         "id": emergency_id,
@@ -326,11 +351,40 @@ async def resolve_emergency(inc_id: str, authorization: Optional[str] = Header(N
             cam["statusText"] = "Status: Normal"
             cam["actionType"] = "view"
             cam["actionLabel"] = "View"
-        last_cam_alerts.pop(cam_id, None)
+        last_cam_alerts[cam_id] = time.time()
 
     db.save()
     await sio.emit("emergency_resolved", {"id": inc_id, "camera_id": cam_id})
     return {"success": True}
+
+
+@fastapi_app.post("/api/cameras/{cam_id}/resolve")
+async def resolve_camera_emergency(cam_id: str, authorization: Optional[str] = Header(None)):
+    db.load()
+    cam = db.find_camera(cam_id)
+    if not cam:
+        raise HTTPException(status_code=404, detail="Kamera tidak ditemukan")
+
+    # Mark all emergencies for this camera as RESOLVED
+    for e in db.data.get("emergencies", []):
+        if e.get("camera_id") == cam["id"]:
+            e["alert_status"] = "RESOLVED"
+
+    cam["hasAlert"] = False
+    cam["badgeType"] = "green"
+    cam["badgeText"] = "• Normal"
+    cam["statusText"] = "Status: Normal"
+    cam["actionType"] = "view"
+    cam["actionLabel"] = "View"
+    cam["alertType"] = None
+    cam["bboxLabel"] = None
+    cam["isDispatched"] = False
+
+    last_cam_alerts[cam["id"]] = time.time()
+    db.save()
+
+    await sio.emit("emergency_resolved", {"camera_id": cam["id"]})
+    return {"success": True, "camera": cam}
 
 
 class DispatchRequest(BaseModel):
@@ -357,12 +411,13 @@ async def dispatch_unit(req: DispatchRequest, authorization: Optional[str] = Hea
 
     cam = db.find_camera(req.camera_id)
     if cam:
-        cam["hasAlert"] = False
+        # Keep emergency active and alert true after dispatch until resolved or symptom clears
+        cam["hasAlert"] = True
         cam["badgeType"] = "blue"
         cam["badgeText"] = f"• Dispatched ({req.responder})"
-        cam["statusText"] = f"Dispatched ({req.responder})"
+        cam["statusText"] = f"🚨 {cam.get('alertType') or 'Emergency'} (Dispatched: {req.responder})"
         cam["actionLabel"] = "Dispatched"
-    last_cam_alerts.pop(req.camera_id, None)
+        cam["isDispatched"] = True
 
     db.save()
     await sio.emit("dispatch_updated", {
@@ -566,6 +621,8 @@ async def _cam_inference_worker(cam_id: str):
                 cam = db.find_camera(cam_id)
                 if cam and cam.get("peopleCount") != p_count:
                     cam["peopleCount"] = p_count
+                    db.save()
+                    await sio.emit("people_count_updated", {"camera_id": cam["id"], "people_count": p_count})
 
                 # Check for confirmed emergency vs normal posture
                 now_sec = time.time()
@@ -588,23 +645,6 @@ async def _cam_inference_worker(cam_id: str):
                                 bbox_label=f"{sym} #{person.get('track_id')}"
                             ))
 
-                # Auto-recovery: If camera has alert but no symptoms are detected, return to Normal after 4s
-                if not detected_any_symptom:
-                    cam = db.find_camera(cam_id)
-                    if cam and cam.get("hasAlert"):
-                        last_alert_t = last_cam_alerts.get(cam_id, 0.0)
-                        if now_sec - last_alert_t > 4.0:
-                            cam["hasAlert"] = False
-                            cam["alertType"] = None
-                            cam["bboxLabel"] = None
-                            cam["badgeText"] = "• Normal"
-                            cam["badgeType"] = "green"
-                            cam["statusText"] = "Status: Normal"
-                            cam["actionType"] = "view"
-                            cam["actionLabel"] = "View"
-                            last_cam_alerts.pop(cam_id, None)
-                            db.save()
-                            await sio.emit("emergency_resolved", {"camera_id": cam_id})
 
 
                 # Remove internal frame reference before returning
@@ -615,6 +655,11 @@ async def _cam_inference_worker(cam_id: str):
                 await sio.emit("cv_error", {"error": str(exc)}, to=sid)
     finally:
         active_cam_tasks.discard(cam_id)
+        cam = db.find_camera(cam_id)
+        if cam and cam.get("peopleCount", 0) != 0:
+            cam["peopleCount"] = 0
+            db.save()
+            await sio.emit("people_count_updated", {"camera_id": cam_id, "people_count": 0})
 
 
 @sio.event

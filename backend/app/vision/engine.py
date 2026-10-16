@@ -86,6 +86,53 @@ def nms(boxes, scores, iou_threshold=0.45):
     return keep
 
 
+def is_valid_person(bbox: np.ndarray, score: float, kp: np.ndarray) -> bool:
+    """Validate that a detection represents a real human body rather than a hand/limb/noise.
+    kp shape: (17, 3), where each row is (x, y, conf).
+    COCO-17 keypoint indices:
+      0: nose, 1-2: eyes, 3-4: ears, 5-6: shoulders, 7-8: elbows, 9-10: wrists,
+      11-12: hips, 13-14: knees, 15-16: ankles.
+    """
+    x1, y1, x2, y2 = bbox
+    w = max(0.0, x2 - x1)
+    h = max(0.0, y2 - y1)
+
+    # Reject tiny noise, extreme slivers, or microscopic artifacts
+    if w < 24 or h < 34 or (w * h) < 1200:
+        return False
+
+    confs = kp[:, 2]
+    # At least 4 keypoints must have reasonable confidence
+    if np.sum(confs >= 0.30) < 4:
+        return False
+
+    has_shoulder = bool(confs[5] >= 0.30 or confs[6] >= 0.30)
+    has_hip = bool(confs[11] >= 0.25 or confs[12] >= 0.25)
+    has_face = bool(np.any(confs[0:5] >= 0.35))
+    has_leg = bool(np.any(confs[13:17] >= 0.28))
+
+    # A valid human detection MUST possess a torso/upper-body anchor:
+    # 1. At least one shoulder, OR
+    # 2. At least one facial feature AND (a hip or a leg)
+    if not (has_shoulder or (has_face and (has_hip or has_leg))):
+        return False
+
+    # Prevent isolated hands/forearms:
+    # Isolated hands only have wrists (9, 10) or elbows (7, 8).
+    # If there are NO shoulders, NO hips, and NO facial keypoints, reject immediately!
+    if not (has_shoulder or has_hip or has_face):
+        return False
+
+    # If detection confidence is borderline (< 0.50), demand stronger anatomical presence
+    if score < 0.50:
+        if np.sum(confs >= 0.32) < 5:
+            return False
+        if not (has_shoulder and (has_hip or has_face or has_leg)):
+            return False
+
+    return True
+
+
 class VisionEngine:
     def __init__(self):
         opts = ort.SessionOptions()
@@ -192,6 +239,9 @@ class VisionEngine:
             # Multi-person Tracking Association (Centroid Euclidean Nearest-Neighbor)
             assigned_track_ids = []
             for bbox, score, kp in zip(boxes_xyxy, scores, kps):
+                if not is_valid_person(bbox, float(score), kp):
+                    continue
+
                 cx = (bbox[0] + bbox[2]) / 2
                 cy = (bbox[1] + bbox[3]) / 2
 

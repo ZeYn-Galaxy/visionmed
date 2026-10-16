@@ -15,11 +15,11 @@ POSE_MODEL = os.getenv("VISIONMED_POSE_MODEL", "yolo11s-pose.pt")
 # Optional learned symptom classifier trained by training/train_classifier.py
 SYMPTOM_CLASSIFIER = MODELS_DIR / "symptom_classifier.pt"
 
-DETECTION_CONF = float(os.getenv("VISIONMED_DET_CONF", "0.35"))
+DETECTION_CONF = float(os.getenv("VISIONMED_DET_CONF", "0.45"))
 INFER_IMGSZ = int(os.getenv("VISIONMED_IMGSZ", "640"))
 
 # A symptom must persist this long (seconds) before an emergency is raised
-CONFIRM_SECONDS = float(os.getenv("VISIONMED_CONFIRM_SECONDS", "1.5"))
+CONFIRM_SECONDS = float(os.getenv("VISIONMED_CONFIRM_SECONDS", "2.5"))
 # Do not raise the same symptom for the same camera more than once per cooldown
 ALERT_COOLDOWN_SECONDS = float(os.getenv("VISIONMED_ALERT_COOLDOWN", "30"))
 

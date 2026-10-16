@@ -45,7 +45,6 @@ interface TrackedPerson {
 
 export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({
   camera,
-  isDetailedView = false,
   isWebcamActive: controlledIsWebcamActive,
   selectedDeviceId: controlledSelectedDeviceId,
   onToggleWebcam,
@@ -58,9 +57,9 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({
   const currentStreamRef = useRef<MediaStream | null>(null);
 
   // Uncontrolled state fallbacks if not supplied as props
-  const [internalWebcamActive, setInternalWebcamActive] = useState<boolean>(false);
+  const [internalWebcamActive] = useState<boolean>(false);
   const [internalSelectedDeviceId, setInternalSelectedDeviceId] = useState<string>('');
-  const [availableDevices, setAvailableDevices] = useState<VideoDevice[]>([]);
+  const [, setAvailableDevices] = useState<VideoDevice[]>([]);
   const [webcamError, setWebcamError] = useState<string | null>(null);
   const [backendInferStats, setBackendInferStats] = useState<{ fps: number; ms: number } | null>(null);
 
@@ -90,15 +89,28 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({
   const effectiveWebcamActive = controlledIsWebcamActive !== undefined ? controlledIsWebcamActive : internalWebcamActive;
   const effectiveDeviceId = controlledSelectedDeviceId !== undefined ? controlledSelectedDeviceId : internalSelectedDeviceId;
 
-  const { socket } = useAppStore();
+  const {
+    socket,
+    isCameraMirrored,
+    updateCameraPeopleCount,
+    triggerEmergencyAlert,
+    reportCVDetection,
+    currentUser
+  } = useAppStore();
+  const isAdmin = currentUser?.role === 'admin';
+  const isCameraMirroredRef = useRef(isCameraMirrored);
+  useEffect(() => {
+    isCameraMirroredRef.current = isCameraMirrored;
+  }, [isCameraMirrored]);
 
   // Multi-person tracking collection
   const trackedPersonsRef = useRef<Map<string, TrackedPerson>>(new Map());
   const prevFrameDataRef = useRef<Uint8ClampedArray | null>(null);
   const isStreamingToBackendRef = useRef<boolean>(false);
   const lastStreamTimeRef = useRef<number>(0);
-  const lastAlertTimeRef = useRef<number>(0);
-  const lastAlertSymptomRef = useRef<string>('');
+  const lastCountReportRef = useRef<number>(0);
+  const lastReportedCountRef = useRef<number>(-1);
+  const lastTriggeredAlertTimeRef = useRef<number>(0);
 
   // Enumerate video devices (isolated, never in camera stream loop)
   const enumerateDevices = useCallback(async () => {
@@ -191,7 +203,7 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({
 
         // Re-enumerate devices to update labels now that permission is active
         enumerateDevices();
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (isCancelled) return;
         console.error('Camera access error:', err);
         setWebcamError('Akses kamera tidak diizinkan atau kamera sedang digunakan aplikasi lain.');
@@ -239,6 +251,10 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({
       const stats = { fps: data.fps, ms: data.infer_ms };
       setBackendInferStats(stats);
       onStatsChangeRef.current?.(stats);
+
+      if (typeof data.people_count === 'number') {
+        updateCameraPeopleCount(camera.id, data.people_count);
+      }
 
       const tracks = trackedPersonsRef.current;
       const now = Date.now();
@@ -341,7 +357,15 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({
 
       if (isVideoActive && videoRef.current) {
         // Draw real webcam video feed
-        ctx.drawImage(videoRef.current, 0, 0, w, h);
+        if (isCameraMirroredRef.current) {
+          ctx.save();
+          ctx.translate(w, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(videoRef.current, 0, 0, w, h);
+          ctx.restore();
+        } else {
+          ctx.drawImage(videoRef.current, 0, 0, w, h);
+        }
 
         // Stream 16:9 frame to Python Backend YOLO-Pose via WebSocket (~15-20 fps)
         const frameInterval = 65;
@@ -352,7 +376,15 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({
           }
 
           if (!isStreamingToBackendRef.current) {
-            downCtx.drawImage(videoRef.current, 0, 0, 320, 180);
+            if (isCameraMirroredRef.current) {
+              downCtx.save();
+              downCtx.translate(320, 0);
+              downCtx.scale(-1, 1);
+              downCtx.drawImage(videoRef.current, 0, 0, 320, 180);
+              downCtx.restore();
+            } else {
+              downCtx.drawImage(videoRef.current, 0, 0, 320, 180);
+            }
             const frameB64 = downCanvas.toDataURL('image/jpeg', 0.60);
             isStreamingToBackendRef.current = true;
             lastStreamTimeRef.current = now;
@@ -373,11 +405,19 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({
                     const stats = { fps: 20, ms: res.infer_ms };
                     setBackendInferStats(stats);
                     onStatsChangeRef.current?.(stats);
+                    if (typeof res.people_count === 'number') {
+                      const nowTs = Date.now();
+                      if (res.people_count !== lastReportedCountRef.current || nowTs - lastCountReportRef.current > 1200) {
+                        lastReportedCountRef.current = res.people_count;
+                        lastCountReportRef.current = nowTs;
+                        updateCameraPeopleCount(camera.id, res.people_count);
+                      }
+                    }
                     const tracks = trackedPersonsRef.current;
                     const scaleX = 640 / 320;
                     const scaleY = 360 / 180;
                     const actIds = new Set<string>();
-                    res.persons.forEach((p: any) => {
+                    res.persons.forEach((p: { track_id: number; bbox: number[]; symptom?: string; posture?: string; confidence?: number; keypoints?: [number, number, number][] }) => {
                       const pId = `PERSON #${p.track_id < 10 ? '0' + p.track_id : p.track_id}`;
                       actIds.add(pId);
                       const bx1 = p.bbox[0] * scaleX;
@@ -397,7 +437,7 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({
                         targetW: Math.max(bx2 - bx1, 30),
                         targetH: Math.max(by2 - by1, 50),
                         label: isAlert ? `🚨 ${p.symptom}` : `${pId} (${p.posture || 'Normal'})`,
-                        confidence: p.confidence,
+                        confidence: p.confidence || 0.95,
                         isAlert,
                         status: statusText,
                         lastSeen: now,
@@ -460,11 +500,24 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({
               emergencyName = trk.status.replace('CRITICAL: ', '') || 'EMERGENCY';
             }
 
-            drawPersonDetectionBox(ctx, trk, tick);
+            drawPersonDetectionBox(ctx, trk);
           });
 
           if (anyEmergency) {
             updateStatus(emergencyName);
+
+            // Instantly sound alarm and trigger warning banner & ambient glow
+            if (now - lastTriggeredAlertTimeRef.current > 4000) {
+              lastTriggeredAlertTimeRef.current = now;
+              triggerEmergencyAlert(camera.id, emergencyName, camera.name);
+              reportCVDetection(
+                camera.id,
+                emergencyName,
+                `Status: Critical ${emergencyName}`,
+                'YOLO11-Pose Edge Model',
+                emergencyName
+              );
+            }
           } else {
             updateStatus(`Active (${tracks.size} People Detected)`);
           }
@@ -475,6 +528,12 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({
           trackedPersonsRef.current.clear();
         }
         prevFrameDataRef.current = null;
+
+        // Reset people count to 0 when camera is offline / standby
+        if (camera.peopleCount !== 0) {
+          lastReportedCountRef.current = 0;
+          updateCameraPeopleCount(camera.id, 0);
+        }
 
         // Clean authentic surveillance standby monitor screen
         drawCameraUnavailableScreen(ctx, w, h, camera, tick);
@@ -525,7 +584,7 @@ export const CCTVFeedCanvas: React.FC<CCTVFeedCanvasProps> = ({
 
       {/* Top right CCTV Status Watermark (Non-interactive HUD) */}
       <div className="absolute top-1.5 right-2 flex items-center gap-1.5 z-10 pointer-events-none">
-        {backendInferStats && effectiveWebcamActive && (
+        {isAdmin && backendInferStats && effectiveWebcamActive && (
           <span className="bg-slate-900/80 text-cyan-400 font-mono text-[8px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/30 flex items-center gap-1">
             <Cpu className="w-2.5 h-2.5 text-cyan-400" />
             <span>YOLO {backendInferStats.fps} FPS</span>
@@ -604,7 +663,7 @@ function drawScanningReticle(ctx: CanvasRenderingContext2D, w: number, h: number
   ctx.restore();
 }
 
-function drawPersonDetectionBox(ctx: CanvasRenderingContext2D, person: TrackedPerson, tick: number) {
+function drawPersonDetectionBox(ctx: CanvasRenderingContext2D, person: TrackedPerson) {
   const { x, y, w, h, label, confidence, isAlert, keypoints } = person;
   const color = isAlert ? '#ef4444' : '#22c55e';
   const bracketLen = Math.min(w, h) * 0.18;
@@ -807,12 +866,12 @@ function drawCameraUnavailableScreen(
   ctx.fillStyle = '#f8fafc';
   ctx.font = 'bold 12px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('SURVEILLANCE FEED STANDBY', iconX, iconY);
+  ctx.fillText('CAMERA FEED STANDBY', iconX, iconY);
 
   // Subtitle Diagnostic
   ctx.fillStyle = '#94a3b8';
   ctx.font = '9px monospace';
-  ctx.fillText('RTSP STREAM / CAMERA INACTIVE', iconX, iconY + 18);
+  ctx.fillText('STREAM / CAMERA INACTIVE', iconX, iconY + 18);
 
   // Diagnostic Info
   ctx.fillStyle = '#64748b';
@@ -822,7 +881,7 @@ function drawCameraUnavailableScreen(
   // Note at bottom of the box
   ctx.fillStyle = '#0284c7';
   ctx.font = 'bold 9px sans-serif';
-  ctx.fillText('VisionMed AI Pose Surveillance Network', iconX, iconY + 54);
+  ctx.fillText('VisionMed Smart Health Monitoring System', iconX, iconY + 54);
 
   ctx.textAlign = 'left';
 }

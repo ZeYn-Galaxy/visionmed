@@ -58,6 +58,14 @@ interface AppState {
   startSiren: () => void;
   stopSiren: () => void;
 
+  // Active Webcam sync between Detail & Dashboard
+  activeWebcamCameraId: string | null;
+  activeWebcamDeviceId: string | null;
+  setActiveWebcam: (cameraId: string | null, deviceId?: string) => void;
+
+  // Dismiss Active Alert Banner
+  dismissActiveAlert: () => void;
+
   // Actions
   resolveAlert: (incidentId: string, cameraId: string) => Promise<void>;
   dispatchCamera: (cameraId: string, responder: string, emergencyId?: string) => Promise<void>;
@@ -78,9 +86,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedCameraForDispatch: null,
   isDispatchModalOpen: false,
   isAlertTeamModalOpen: false,
-  activeAlertDetails: null,
   isAddCameraModalOpen: false,
   isMediaTesterModalOpen: false,
+  activeAlertDetails: null,
+  activeWebcamCameraId: null,
+  activeWebcamDeviceId: null,
+  setActiveWebcam: (cameraId, deviceId) =>
+    set({
+      activeWebcamCameraId: cameraId,
+      activeWebcamDeviceId: deviceId || null
+    }),
+  dismissActiveAlert: () => set({ activeAlertDetails: null }),
 
   setActiveTab: (tab) => set({ activeTab: tab }),
 
@@ -224,9 +240,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
 
 
-    socket.on('emergency_resolved', () => {
+    socket.on('emergency_resolved', (payload?: { camera_id?: string }) => {
       get().fetchCameras();
       get().fetchEmergencies();
+      if (!payload?.camera_id || get().activeAlertDetails?.cameraId === payload.camera_id) {
+        get().dismissActiveAlert();
+      }
     });
 
     socket.on('camera_added', (cam) => {
@@ -414,37 +433,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
 
     if (role === 'security') {
-      // Security Guard: Loud Web Audio Siren + Visual AlertTeamModal
+      // Security Guard: Web Audio Siren (No full-screen modal popup; ambient glow + top-right swipeable banner)
       get().startSiren();
-      set({ isAlertTeamModalOpen: true });
-      toast.error(`🚨 ALERT DARURAT: ${symptom} di ${cam.name || cameraId}!`, {
-        id: `alert-${cameraId}`,
-        duration: 8000,
-        style: {
-          background: '#7f1d1d',
-          color: '#ffffff',
-          fontWeight: 'bold',
-          border: '2px solid #ef4444'
-        }
-      });
     } else if (role === 'receptionist') {
-      // Receptionist: Medical chime + Toast + OS Desktop Notification
+      // Receptionist: Medical chime + OS Desktop Notification
       if (typeof window !== 'undefined') {
         import('./audioSiren').then((module) => {
           module.playHospitalChime();
         });
       }
-      toast(`⚠️ PERINGATAN MEDIS: ${symptom} terdeteksi di ${cam.name || cameraId}!`, {
-        id: `alert-${cameraId}`,
-        icon: '🏥',
-        duration: 8000,
-        style: {
-          background: '#0369a1',
-          color: '#ffffff',
-          fontWeight: 'bold',
-          border: '2px solid #38bdf8'
-        }
-      });
 
       if (typeof window !== 'undefined' && 'Notification' in window) {
         if (Notification.permission === 'granted') {

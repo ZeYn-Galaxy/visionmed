@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   description: "Real-time AI Medical Emergency Detection Dashboard with Computer Vision",
 };
 
+import { EmergencyAlertBanner } from "../components/notifications/EmergencyAlertBanner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -29,6 +31,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#f8fafc] text-slate-900 min-h-screen`}
       >
         {children}
+        <EmergencyAlertBanner />
       </body>
     </html>
   );

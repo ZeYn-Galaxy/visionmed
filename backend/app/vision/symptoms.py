@@ -21,12 +21,12 @@ import numpy as np
 
 from .features import (
     L_ANK, L_HIP, L_KNE, L_SHO, L_WRI, NOSE, R_ANK, R_HIP, R_KNE, R_SHO, R_WRI,
-    L_EAR, R_EAR, body_frame, normalise_pose, torso_angle_deg, visible, resample_sequence,
+    L_EYE, R_EYE, L_EAR, R_EAR, body_frame, normalise_pose, torso_angle_deg, visible, resample_sequence,
     extract_clinical_features,
 )
 
 HISTORY_SECONDS = 8.0
-SYMPTOM_THRESHOLD = 0.52
+SYMPTOM_THRESHOLD = 0.50
 
 
 @dataclass
@@ -78,6 +78,11 @@ def _is_lying(f: Frame) -> bool:
         low_pt = max(f.kps[L_ANK, 1], f.kps[R_ANK, 1], f.kps[L_KNE, 1], f.kps[R_KNE, 1])
         if low_pt > f.hip[1] + 0.5 * f.torso and aspect < 1.15:
             return False
+    # Upright head keypoints (head clearly above shoulders) means sitting/standing upright
+    head_indices = (NOSE, L_EYE, R_EYE, L_EAR, R_EAR)
+    head_y_pts = [f.kps[i, 1] for i in head_indices if f.kps[i, 2] >= 0.35]
+    if head_y_pts and min(head_y_pts) < f.sho[1] - 0.10 * f.torso and f.angle < 50:
+        return False
     # Upright torso with shoulders well above hips means sitting/standing, NOT lying
     if f.angle < 45 and f.sho[1] < f.hip[1] - 0.15 * f.torso:
         return False
@@ -100,9 +105,6 @@ def detect_fall(st: TrackState, f: Frame) -> tuple[float, str]:
     long_lying = st.window(5.0)
     if len(long_lying) > 5 and long_lying[-1].t - long_lying[0].t > 4 and np.mean([_is_lying(w) for w in long_lying]) > 0.85:
         return 0.72, "person lying on the floor > 4s"
-    # Immediate detection when prone/horizontal posture on floor is recognized
-    if len(st.history) <= 3:
-        return 0.88, "horizontal prone posture on floor (fall/syncope)"
     return 0.0, ""
 
 
@@ -300,15 +302,18 @@ def analyse(st: TrackState, f: Frame, classifier=None) -> dict:
                 feat = extract_clinical_features(f.kps, f.bbox)
                 prob_arr = classifier["model"].predict_proba([feat])[0]
                 classes = classifier["classes"]
-                for cls_name, p in zip(classes, prob_arr):
-                    if cls_name == "Normal" or cls_name not in scores:
-                        continue
-                    p_val = float(p)
-                    if p_val > scores[cls_name][0]:
-                        scores[cls_name] = (p_val, f"Roboflow AI Clinical Model ({int(p_val * 100)}%)")
-                    elif scores[cls_name][0] > 0 and p_val > 0.25:
-                        boosted = min(0.99, 0.45 * scores[cls_name][0] + 0.55 * max(p_val, scores[cls_name][0]))
-                        scores[cls_name] = (boosted, scores[cls_name][1])
+                prob_map = dict(zip(classes, prob_arr))
+                p_normal = float(prob_map.get("Normal", 0.0))
+                max_symptom_prob = max((float(p) for c, p in prob_map.items() if c != "Normal"), default=0.0)
+
+                # Only accept ML symptom prediction if confident (>= 0.50) and clearly dominates Normal
+                if p_normal < 0.35 and max_symptom_prob >= 0.50 and max_symptom_prob > p_normal * 1.5:
+                    for cls_name, p in prob_map.items():
+                        if cls_name == "Normal" or cls_name not in scores:
+                            continue
+                        p_val = float(p)
+                        if p_val >= 0.50 and p_val > scores[cls_name][0]:
+                            scores[cls_name] = (p_val, f"Roboflow AI Clinical Model ({int(p_val * 100)}%)")
             # 2. Sequence classifier fallback
             elif hasattr(classifier, "predict") and len(st.history) >= 4:
                 times = np.array([h.t for h in st.history])

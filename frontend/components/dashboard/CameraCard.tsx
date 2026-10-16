@@ -12,7 +12,9 @@ interface CameraCardProps {
 
 export const CameraCard: React.FC<CameraCardProps> = ({ camera }) => {
   const router = useRouter();
-  const { openDispatchModal } = useAppStore();
+  const { openDispatchModal, activeWebcamCameraId, activeWebcamDeviceId } = useAppStore();
+
+  const isThisCameraWebcamActive = activeWebcamCameraId === camera.id;
 
   const handleAction = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -43,7 +45,7 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera }) => {
       onClick={handleCardClick}
       className={`rounded-xl overflow-hidden bg-white cursor-pointer transition transform hover:-translate-y-0.5 hover:shadow-md flex flex-col justify-between ${
         camera.hasAlert
-          ? 'border-2 border-[#b91c1c] shadow-xs'
+          ? 'border-2 border-red-500 ring-4 ring-red-500/30 shadow-[0_0_30px_rgba(239,68,68,0.45)]'
           : 'border border-gray-200 shadow-2xs'
       }`}
     >
@@ -54,7 +56,9 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera }) => {
           <span
             className={`text-[11px] font-extrabold px-2 py-0.5 rounded tracking-wide ${
               camera.hasAlert
-                ? 'bg-[#b91c1c] text-white'
+                ? 'bg-red-600 text-white animate-pulse'
+                : isThisCameraWebcamActive
+                ? 'bg-emerald-600 text-white'
                 : 'bg-slate-100 text-slate-700'
             }`}
           >
@@ -69,7 +73,7 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera }) => {
         <span
           className={`text-[11px] font-bold px-2 py-0.5 rounded-full tracking-wide ${
             camera.badgeType === 'red'
-              ? 'bg-[#b91c1c] text-white'
+              ? 'bg-red-600 text-white animate-pulse'
               : camera.badgeType === 'blue'
               ? 'bg-[#e0f2fe] text-[#0369a1]'
               : 'bg-[#dcfce7] text-[#15803d]'
@@ -79,9 +83,23 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera }) => {
         </span>
       </div>
 
-      {/* CCTV Canvas View */}
-      <div className="relative w-full">
-        <CCTVFeedCanvas camera={camera} />
+      {/* CCTV Canvas View (16:9 Laptop Ratio with Red Ambient Glow on Alert) */}
+      <div className="relative w-full aspect-video bg-slate-950 overflow-hidden">
+        <CCTVFeedCanvas
+          camera={camera}
+          isWebcamActive={isThisCameraWebcamActive}
+          selectedDeviceId={isThisCameraWebcamActive ? activeWebcamDeviceId || undefined : undefined}
+        />
+
+        {/* Ambient Red Glow Frame on Camera When Alert is Detected */}
+        {camera.hasAlert && (
+          <div className="absolute inset-0 pointer-events-none ring-2 ring-inset ring-red-500 shadow-[inset_0_0_35px_rgba(239,68,68,0.55)] z-20 animate-pulse">
+            <div className="absolute top-2 left-2 bg-red-600/90 text-white font-mono font-extrabold text-[9px] px-2 py-0.5 rounded tracking-wider flex items-center gap-1 shadow-md animate-bounce">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+              <span>EMERGENCY DETECTED</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Footer Status & Action */}
@@ -89,7 +107,7 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera }) => {
         <span
           className={`text-xs font-bold truncate max-w-[170px] ${
             camera.hasAlert
-              ? 'text-[#dc2626]'
+              ? 'text-red-600'
               : camera.badgeType === 'blue'
               ? 'text-[#0284c7]'
               : 'text-slate-600'
@@ -102,8 +120,8 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera }) => {
         <button
           onClick={handleAction}
           className={`text-xs font-bold px-3 py-1 rounded transition active:scale-95 shadow-2xs ${
-            camera.actionType === 'dispatch'
-              ? 'bg-[#b91c1c] hover:bg-[#991b1b] text-white'
+            camera.actionType === 'dispatch' || camera.hasAlert
+              ? 'bg-red-600 hover:bg-red-700 text-white'
               : camera.actionType === 'wheelchair'
               ? 'bg-[#0284c7] hover:bg-[#0369a1] text-white'
               : 'bg-[#e0f2fe] hover:bg-[#bae6fd] text-[#0369a1]'

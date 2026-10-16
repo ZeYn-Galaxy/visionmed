@@ -326,6 +326,7 @@ async def resolve_emergency(inc_id: str, authorization: Optional[str] = Header(N
             cam["statusText"] = "Status: Normal"
             cam["actionType"] = "view"
             cam["actionLabel"] = "View"
+        last_cam_alerts.pop(cam_id, None)
 
     db.save()
     await sio.emit("emergency_resolved", {"id": inc_id, "camera_id": cam_id})
@@ -356,8 +357,12 @@ async def dispatch_unit(req: DispatchRequest, authorization: Optional[str] = Hea
 
     cam = db.find_camera(req.camera_id)
     if cam:
+        cam["hasAlert"] = False
+        cam["badgeType"] = "blue"
+        cam["badgeText"] = f"• Dispatched ({req.responder})"
         cam["statusText"] = f"Dispatched ({req.responder})"
         cam["actionLabel"] = "Dispatched"
+    last_cam_alerts.pop(req.camera_id, None)
 
     db.save()
     await sio.emit("dispatch_updated", {
@@ -562,21 +567,44 @@ async def _cam_inference_worker(cam_id: str):
                 if cam and cam.get("peopleCount") != p_count:
                     cam["peopleCount"] = p_count
 
-                # Check for confirmed emergency
+                # Check for confirmed emergency vs normal posture
                 now_sec = time.time()
+                detected_any_symptom = False
+
                 for person in result.get("persons", []):
                     sym = person.get("symptom")
-                    if sym and (person.get("confirmed") or person.get("symptom_duration", 0) >= 0.8 or person.get("confidence", 0) >= 0.7):
+                    sym_score = person.get("symptom_score", 0.0)
+                    sym_dur = person.get("symptom_duration", 0.0)
+                    if sym and sym_score >= 0.50 and (person.get("confirmed") or sym_dur >= 1.2):
+                        detected_any_symptom = True
                         last_alert_t = last_cam_alerts.get(cam_id, 0.0)
-                        if now_sec - last_alert_t > 5.0:
+                        if now_sec - last_alert_t > 6.0:
                             last_cam_alerts[cam_id] = now_sec
                             await report_emergency(EmergencyReport(
                                 camera_id=cam_id,
                                 detected_symptom=sym,
                                 status_label=f"Status: {sym} (#{person.get('track_id')})",
-                                confidence_score=person.get("confidence", 0.95) * 100,
+                                confidence_score=sym_score * 100,
                                 bbox_label=f"{sym} #{person.get('track_id')}"
                             ))
+
+                # Auto-recovery: If camera has alert but no symptoms are detected, return to Normal after 4s
+                if not detected_any_symptom:
+                    cam = db.find_camera(cam_id)
+                    if cam and cam.get("hasAlert"):
+                        last_alert_t = last_cam_alerts.get(cam_id, 0.0)
+                        if now_sec - last_alert_t > 4.0:
+                            cam["hasAlert"] = False
+                            cam["alertType"] = None
+                            cam["bboxLabel"] = None
+                            cam["badgeText"] = "• Normal"
+                            cam["badgeType"] = "green"
+                            cam["statusText"] = "Status: Normal"
+                            cam["actionType"] = "view"
+                            cam["actionLabel"] = "View"
+                            last_cam_alerts.pop(cam_id, None)
+                            db.save()
+                            await sio.emit("emergency_resolved", {"camera_id": cam_id})
 
 
                 # Remove internal frame reference before returning

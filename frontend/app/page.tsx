@@ -57,7 +57,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen w-full bg-slate-100/90 text-slate-900 flex flex-col justify-between selection:bg-cyan-500 selection:text-white">
-      <Toaster position="top-right" />
+      <Toaster position="top-right" containerStyle={{ top: 80, right: 24 }} />
 
       {/* Sticky Full-Width Header */}
       <Header />

@@ -13,13 +13,12 @@ Sistem Computer Vision didukung oleh neural network berbasis dataset berstandar 
 - **Dataset-Trained Model**: Model `yolo11n-pose.onnx` dioptimasi menggunakan ONNXRuntime (inferensi ~40-60 ms per frame) sehingga berjalan sangat responsif di CPU maupun GPU tanpa lag.
 - **Kamera Device Selector**: Memungkinkan pemilihan perangkat video input (Webcam Terintegrasi, USB Camera eksternal, OBS Virtual Camera, dsb.) secara langsung melalui dropdown pada setiap kartu CCTV tanpa navigasi yang tidak disengaja.
 - **Tampilan Otentik "Camera Unavailable"**: Kamera yang offline tidak lagi menggunakan animasi stickman buatan, melainkan menampilkan status monitor sekuriti profesional dengan kode diagnostik RTSP.
-- **Evaluasi 6 Gejala Klinis Kedaruratan**:
+- **Evaluasi 5 Gejala Klinis Kedaruratan**:
   1. **Fall / Syncope (Jatuh Tiba-tiba)**: Akselerasi vertikal ke arah lantai $\Delta Y / \Delta t$ yang drastis kemudian posisi horizontal.
   2. **Chest Pain / Heart Clutch (Nyeri Dada / Serangan Jantung)**: Tangan menempel pada sternum dada disertai postur membungkuk.
   3. **Pre-Syncope / Counter Slump (Hampir Pingsan / Terkulai)**: Penurunan gradual kepala di bawah garis bahu dan hilangnya keseimbangan motorik.
   4. **Seizures / Convulsions (Kejang / Tremor)**: Osilasi frekuensi tinggi pada ekstremitas ($> 2\text{ Hz}$).
-  5. **Respiratory Distress / Tachypnea (Sesak Napas Berat)**: Tripod posture (kedua tangan di lutut sambil membungkuk) atau elevasi ritmik bahu cepat ($> 30\text{ siklus/menit}$).
-  6. **Acute Stroke / Bilateral Motor Asymmetry (Defisit Motorik Unilateral)**: Deviasi disparitas pergerakan ekstremitas kiri dan kanan (arm-drift test) dan facial/shoulder droop.
+  5. **Acute Stroke / Bilateral Motor Asymmetry (Defisit Motorik Unilateral)**: Deviasi disparitas pergerakan ekstremitas kiri dan kanan (arm-drift test) dan facial/shoulder droop.
 
 ---
 

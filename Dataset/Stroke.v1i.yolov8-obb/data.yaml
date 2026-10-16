@@ -1,0 +1,13 @@
+train: train/images
+val: valid/images
+test: test/images
+
+names: 
+  0: normalEye
+  1: normalMouth
+  2: strokeEyeMid
+  3: strokeEyeSevere
+  4: strokeEyeWeak
+  5: strokeMouthMid
+  6: strokeMouthSevere
+  7: strokeMouthWeak

@@ -41,7 +41,6 @@ htmlcov/
 
 # --- Datasets (Raw training images & annotations) ---
 # Note: Trained models are preserved in backend/models/
-datasets/
 *.zip
 *.tar.gz
 
